@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="ja">
+
+<head>
+  <meta charset="UTF-8">
+  <title>週間タスク表合成エディタ</title>
+  <style>
+    body {
+      font-family: "Helvetica Neue", Arial, sans-serif;
+      background: #f0f2f5;
+      padding: 20px;
+      color: #333;
+    }
+
+    .container {
+      max-width: 900px;
+      margin: 0 auto;
+      background: white;
+      padding: 20px;
+      border-radius: 8px;
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+    }
+
+    /* タブスタイル */
+    .tabs {
+      display: flex;
+      border-bottom: 2px solid #ddd;
+      margin-bottom: 20px;
+    }
+
+    .tab {
+      padding: 10px 20px;
+      cursor: pointer;
+      border: 1px solid transparent;
+      margin-bottom: -2px;
+      border-radius: 5px 5px 0 0;
+    }
+
+    .tab.active {
+      background: white;
+      border: 2px solid #ddd;
+      border-bottom: 2px solid white;
+      font-weight: bold;
+      color: #007bff;
+    }
+
+    .event-content {
+      display: none;
+    }
+
+    .event-content.active {
+      display: block;
+    }
+
+    /* テーブルスタイル */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-bottom: 10px;
+    }
+
+    th,
+    td {
+      border: 1px solid #eee;
+      padding: 3px;
+      text-align: center;
+    }
+
+    th {
+      background: #f8f9fa;
+      font-size: 0.9em;
+    }
+
+    .mission-input {
+      width: 50px;
+      padding: 5px;
+      border: 1px solid #ccc;
+      border-radius: 3px;
+    }
+
+    /* ボタン類 */
+    .add-btn {
+      background: #28a745;
+      color: white;
+      border: none;
+      padding: 5px 12px;
+      border-radius: 20px;
+      cursor: pointer;
+      font-size: 1.2em;
+    }
+
+    .remove-btn {
+      background: #dc3545;
+      color: white;
+      border: none;
+      padding: 2px 8px;
+      border-radius: 3px;
+      cursor: pointer;
+    }
+
+    .generate-area {
+      margin-top: 30px;
+      border-top: 2px solid #eee;
+      pt: 20px;
+      text-align: center;
+    }
+
+    .main-btn {
+      background: #007bff;
+      color: white;
+      border: none;
+      padding: 12px 30px;
+      border-radius: 5px;
+      cursor: pointer;
+      font-size: 1.1em;
+      font-weight: bold;
+    }
+
+    textarea {
+      width: 100%;
+      height: 300px;
+      margin-top: 15px;
+      font-family: monospace;
+      padding: 10px;
+      box-sizing: border-box;
+      background: #fafafa;
+    }
+
+    .legend {
+      font-size: 0.85em;
+      color: #666;
+      margin-bottom: 10px;
+    }
+  </style>
+</head>
+
+<body>
+
+  <div class="container">
+    <h2>週間タスク表合成エディタ</h2>
+    <div class="legend">◎:両方 🔴:イベント1のみ 🔵:イベント2のみ －:なし</div>
+
+    <div class="tabs">
+      <div class="tab active" onclick="switchTab(1)">イベント 1</div>
+      <div class="tab" onclick="switchTab(2)">イベント 2</div>
+    </div>
+
+    <div id="event1" class="event-content active">
+      <table id="table1">
+        <thead>
+          <tr>
+            <th>Msn</th>
+            <th>月</th>
+            <th>火</th>
+            <th>水</th>
+            <th>木</th>
+            <th>金</th>
+            <th>土</th>
+            <th>日</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody class="tbody"></tbody>
+      </table>
+      <button class="add-btn" onclick="addRow('table1')">＋ 行を追加</button>
+    </div>
+
+    <div id="event2" class="event-content">
+      <table id="table2">
+        <thead>
+          <tr>
+            <th>Msn</th>
+            <th>月</th>
+            <th>火</th>
+            <th>水</th>
+            <th>木</th>
+            <th>金</th>
+            <th>土</th>
+            <th>日</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody class="tbody"></tbody>
+      </table>
+      <button class="add-btn" onclick="addRow('table2')">＋ 行を追加</button>
+    </div>
+
+    <div class="generate-area">
+      <button class="main-btn" onclick="generateOutput()">テキスト表を作成</button>
+      <textarea id="outputText" readonly placeholder="ここに合成結果が出力されます"></textarea>
+    </div>
+  </div>
+
+  <script>
+    // 初期化：デフォルトのミッション項目
+    const defaultMissions = ["総力", "火晶", "加速", "訓練", "欠片", "領主装", "領主宝", "英装備", "採集", "ラキル", "ペット", "鍵募集", "野巨獣", "ダイヤ"];
+    window.onload = () => {
+      defaultMissions.forEach(m => {
+        addRow('table1', m);
+        addRow('table2', m);
+      });
+    };
+
+    function switchTab(num) {
+      document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+      document.querySelectorAll('.event-content').forEach(c => c.classList.remove('active'));
+      document.querySelectorAll('.tab')[num - 1].classList.add('active');
+      document.getElementById(`event${num}`).classList.add('active');
+    }
+
+    function addRow(tableId, missionName = "") {
+      const tbody = document.querySelector(`#${tableId} .tbody`);
+      const tr = document.createElement('tr');
+      let checkboxes = "";
+      for (let i = 0; i < 7; i++) {
+        checkboxes += `<td><input type="checkbox" class="day-check"></td>`;
+      }
+      tr.innerHTML = `
+            <td><input type="text" class="mission-input" value="${missionName}" list="mission-list"></td>
+            ${checkboxes}
+            <td><button class="remove-btn" onclick="this.parentElement.parentElement.remove()">×</button></td>
+        `;
+      tbody.appendChild(tr);
+    }
+
+    function getTableData(tableId) {
+      const rows = document.querySelectorAll(`#${tableId} .tbody tr`);
+      let data = {};
+      rows.forEach(row => {
+        const name = row.querySelector('.mission-input').value;
+        if (!name) return;
+        const checks = Array.from(row.querySelectorAll('.day-check')).map(c => c.checked);
+        data[name] = checks;
+      });
+      return data;
+    }
+
+    function generateOutput() {
+      const data1 = getTableData('table1');
+      const data2 = getTableData('table2');
+      // すべてのミッション名をユニークに抽出
+      const allMissionNames = Array.from(new Set([...Object.keys(data1), ...Object.keys(data2)]));
+      let output = "日付　月　火　水　木　金　土　日\n";
+      allMissionNames.forEach(name => {
+        let rowText = (name + "　　").slice(0, 3); // 名前を3文字幅に簡易調整
+        let symbols = [];
+        for (let i = 0; i < 7; i++) {
+          const checked1 = data1[name] ? data1[name][i] : false;
+          const checked2 = data2[name] ? data2[name][i] : false;
+          if (checked1 && checked2) symbols.push("◎");
+          else if (checked1) symbols.push("🔴");
+          else if (checked2) symbols.push("🔵");
+          else symbols.push("－");
+        }
+        output += `${rowText} ${symbols.join('┃')} \n`;
+      });
+      output += "\n◎2イベント共通 🔴＝イベント1 🔵＝イベント2";
+      const outputField = document.getElementById('outputText');
+      outputField.value = output;
+      // 自動コピー
+      outputField.select();
+      document.execCommand('copy');
+      alert("テキスト表を作成し、クリップボードにコピーしました！");
+    }
+  </script>
+
+  <datalist id="mission-list">
+    <option value="総力" />
+    <option value="火晶" />
+    <option value="加速" />
+    <option value="訓練" />
+    <option value="欠片" />
+    <option value="領主装" />
+    <option value="領主宝" />
+    <option value="英装備" />
+    <option value="採集" />
+    <option value="ラキル" />
+    <option value="ペット" />
+    <option value="鍵募集" />
+    <option value="野巨獣" />
+    <option value="ダイヤ" />
+  </datalist>
+
+</body>
+
+</html>
