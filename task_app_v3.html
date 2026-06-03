@@ -47,9 +47,9 @@
             <label style="margin-left:auto"><strong>テンプレート:</strong></label>
             <select id="templateSelect" onchange="applyTemplate()">
                 <option value="">-- 選択 --</option>
-                <option value="saikyo">最強領主 (SKS)</option>
-                <option value="hikari">光の結実 (共通)</option>
-                <option value="shigen">資源・野獣</option>
+                <option value="saikyo">最強領主</option>
+                <option value="kemono">野獣討伐</option>
+                <option value="svsjunbi">SvS準備</option>
                 <option value="clear">リセット</option>
             </select>
         </div>
@@ -81,7 +81,7 @@
     let currentTab = 1;
     let eventData = {
         1: { name: "最強領主", rows: [] },
-        2: { name: "光の結実", rows: [] }
+        2: { name: "野獣討伐", rows: [] }
     };
 
     const templates = {
@@ -93,7 +93,7 @@
             { name: "訓練", checks: [false, false, false, false, true, false, false] },
             { name: "総力", checks: [false, false, false, false, false, true, true] }
         ],
-        hikari: [
+        kemono: [
             { name: "加速", checks: [true, true, true, true, true, true, true] },
             { name: "英雄", checks: [true, false, true, false, true, false, true] }
         ]
@@ -187,8 +187,8 @@
                 const c1 = r1 ? r1.checks[i] : false;
                 const c2 = r2 ? r2.checks[i] : false;
                 if (c1 && c2) symbols.push(" ◎ ");
-                else if (c1) symbols.push(" 🔴 ");
-                else if (c2) symbols.push(" 🔵 ");
+                else if (c1) symbols.push(" ○ ");
+                else if (c2) symbols.push(" ＊ ");
                 else symbols.push(" － ");
             }
             output += `${padName(name)} ${symbols.join('┃')}
@@ -196,7 +196,7 @@
         });
 
         output += `
-◎2イベント共通 🔴＝${eventData[1].name} 🔵＝${eventData[2].name}`;
+◎2イベント共通 ○＝${eventData[1].name} ＊＝${eventData[2].name}`;
         const field = document.getElementById('outputText');
         field.value = output;
         field.select();
