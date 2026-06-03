@@ -1,0 +1,208 @@
+
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <title>週間タスク表合成エディタ v3</title>
+    <style>
+        body { font-family: "Helvetica Neue", Arial, "Hiragino Kaku Gothic ProN", sans-serif; background: #f4f7f6; padding: 20px; color: #333; line-height: 1.6; }
+        .container { max-width: 950px; margin: 0 auto; background: white; padding: 25px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
+        h2 { border-left: 5px solid #007bff; padding-left: 15px; margin-bottom: 25px; color: #333; }
+        .tabs { display: flex; gap: 5px; border-bottom: 2px solid #ddd; margin-bottom: 20px; }
+        .tab { padding: 12px 25px; cursor: pointer; border: 1px solid #ddd; border-bottom: none; background: #e9ecef; border-radius: 8px 8px 0 0; transition: 0.2s; }
+        .tab.active { background: white; border-top: 3px solid #007bff; font-weight: bold; color: #007bff; position: relative; top: 2px; }
+        .event-settings { background: #f8f9fa; padding: 15px; border-radius: 8px; margin-bottom: 15px; display: flex; gap: 15px; align-items: center; border: 1px solid #eee; flex-wrap: wrap; }
+        .event-settings input { padding: 8px; border: 1px solid #ccc; border-radius: 4px; width: 200px; }
+        .event-content { display: none; }
+        .event-content.active { display: block; }
+        table { width: 100%; border-collapse: collapse; margin-bottom: 15px; background: white; }
+        th, td { border: 1px solid #ddd; padding: 10px; text-align: center; }
+        th { background: #f1f3f5; font-size: 0.85em; }
+        .mission-input { width: 90%; padding: 6px; border: 1px solid #ccc; border-radius: 4px; font-size: 0.95em; }
+        .controls { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
+        .add-btn { background: #28a745; color: white; border: none; padding: 8px 16px; border-radius: 5px; cursor: pointer; font-weight: bold; }
+        .remove-btn { background: #ff4d4f; color: white; border: none; width: 28px; height: 28px; border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+        select { padding: 8px; border-radius: 4px; border: 1px solid #ccc; background: white; }
+        .generate-area { margin-top: 30px; border-top: 2px solid #eee; padding-top: 25px; text-align: center; }
+        .main-btn { background: #007bff; color: white; border: none; padding: 15px 40px; border-radius: 30px; cursor: pointer; font-size: 1.1em; font-weight: bold; box-shadow: 0 4px 6px rgba(0,123,255,0.3); transition: 0.3s; }
+        .main-btn:hover { background: #0056b3; transform: translateY(-2px); }
+        textarea { width: 100%; height: 350px; margin-top: 20px; font-family: 'Consolas', 'Monaco', 'Courier New', monospace; padding: 15px; box-sizing: border-box; border: 1px solid #ccc; border-radius: 8px; background: #1e1e1e; color: #d4d4d4; font-size: 14px; white-space: pre; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h2>週間タスク表合成エディタ v3</h2>
+
+    <div class="tabs">
+        <div id="tab1" class="tab active" onclick="switchTab(1)">イベント 1</div>
+        <div id="tab2" class="tab" onclick="switchTab(2)">イベント 2</div>
+    </div>
+
+    <div id="event-editor">
+        <div class="event-settings">
+            <label><strong>表示名:</strong></label>
+            <input type="text" id="evName" oninput="updateTabName()" placeholder="イベント名を入力">
+            
+            <label style="margin-left:auto"><strong>テンプレート:</strong></label>
+            <select id="templateSelect" onchange="applyTemplate()">
+                <option value="">-- 選択 --</option>
+                <option value="saikyo">最強領主 (SKS)</option>
+                <option value="hikari">光の結実 (共通)</option>
+                <option value="shigen">資源・野獣</option>
+                <option value="clear">リセット</option>
+            </select>
+        </div>
+
+        <div class="controls">
+            <button class="add-btn" onclick="addNewRow()">＋ ミッションを追加</button>
+            <span style="font-size: 0.85em; color: #666;">※全角3文字（半角6文字）相当で幅調整。空行は除外。</span>
+        </div>
+
+        <table id="taskTable">
+            <thead>
+                <tr>
+                    <th style="width: 180px;">ミッション名</th>
+                    <th>月</th><th>火</th><th>水</th><th>木</th><th>金</th><th>土</th><th>日</th>
+                    <th style="width: 40px;"></th>
+                </tr>
+            </thead>
+            <tbody id="tableBody"></tbody>
+        </table>
+    </div>
+
+    <div class="generate-area">
+        <button class="main-btn" onclick="generateOutput()">テキスト表を作成・コピー</button>
+        <textarea id="outputText" readonly placeholder="合成結果がここに出力されます"></textarea>
+    </div>
+</div>
+
+<script>
+    let currentTab = 1;
+    let eventData = {
+        1: { name: "最強領主", rows: [] },
+        2: { name: "光の結実", rows: [] }
+    };
+
+    const templates = {
+        saikyo: [
+            { name: "採集", checks: [true, false, false, false, false, false, false] },
+            { name: "加速", checks: [false, true, false, false, false, false, false] },
+            { name: "火晶", checks: [false, false, true, false, false, false, false] },
+            { name: "英装備", checks: [false, false, false, true, false, false, false] },
+            { name: "訓練", checks: [false, false, false, false, true, false, false] },
+            { name: "総力", checks: [false, false, false, false, false, true, true] }
+        ],
+        hikari: [
+            { name: "加速", checks: [true, true, true, true, true, true, true] },
+            { name: "英雄", checks: [true, false, true, false, true, false, true] }
+        ]
+    };
+
+    window.onload = () => {
+        // 初期状態
+        eventData[1].rows = JSON.parse(JSON.stringify(templates.saikyo));
+        eventData[2].rows = JSON.parse(JSON.stringify(templates.hikari));
+        renderTable();
+    };
+
+    function switchTab(num) {
+        currentTab = num;
+        document.querySelectorAll('.tab').forEach((t, i) => t.classList.toggle('active', i+1 === num));
+        renderTable();
+    }
+
+    function updateTabName() {
+        const name = document.getElementById('evName').value;
+        eventData[currentTab].name = name || `イベント${currentTab}`;
+        document.getElementById(`tab${currentTab}`).innerText = eventData[currentTab].name;
+    }
+
+    function renderTable() {
+        const data = eventData[currentTab];
+        document.getElementById('evName').value = data.name;
+        document.getElementById(`tab${currentTab}`).innerText = data.name;
+        const tbody = document.getElementById('tableBody');
+        tbody.innerHTML = '';
+        data.rows.forEach((row, index) => {
+            const tr = document.createElement('tr');
+            let checksHtml = row.checks.map((c, i) => `<td><input type="checkbox" ${c ? 'checked' : ''} onchange="eventData[${currentTab}].rows[${index}].checks[${i}]=this.checked"></td>`).join('');
+            tr.innerHTML = `<td><input type="text" class="mission-input" value="${row.name}" oninput="eventData[${currentTab}].rows[${index}].name=this.value"></td>${checksHtml}<td><button class="remove-btn" onclick="removeRow(${index})">×</button></td>`;
+            tbody.appendChild(tr);
+        });
+    }
+
+    function addNewRow() { eventData[currentTab].rows.push({ name: "", checks: Array(7).fill(false) }); renderTable(); }
+    function removeRow(index) { eventData[currentTab].rows.splice(index, 1); renderTable(); }
+
+    function applyTemplate() {
+        const val = document.getElementById('templateSelect').value;
+        if (val === "clear") eventData[currentTab].rows = [];
+        else if (templates[val]) eventData[currentTab].rows = JSON.parse(JSON.stringify(templates[val]));
+        renderTable();
+        document.getElementById('templateSelect').value = "";
+    }
+
+    function getVisualWidth(str) {
+        let width = 0;
+        for (let i = 0; i < str.length; i++) {
+            const c = str.charCodeAt(i);
+            if ((c >= 0x0 && c < 0x81) || (c === 0xf8f0) || (c >= 0xff61 && c <= 0xff9f)) width += 1;
+            else width += 2;
+        }
+        return width;
+    }
+
+    function padName(name) {
+        const targetWidth = 6; // 全角3文字相当
+        let currentWidth = getVisualWidth(name);
+        let res = name;
+        while (currentWidth < targetWidth) {
+            res += " ";
+            currentWidth += 1;
+        }
+        return res;
+    }
+
+    function generateOutput() {
+        const rows1 = eventData[1].rows.filter(r => r.checks.includes(true));
+        const rows2 = eventData[2].rows.filter(r => r.checks.includes(true));
+        const allNames = Array.from(new Set([...rows1.map(r => r.name), ...rows2.map(r => r.name)])).filter(n => n.trim() !== "");
+        
+        let eventHeader = "";
+        if (rows1.length > 0 && rows2.length > 0) eventHeader = `${eventData[1].name}＋${eventData[2].name}`;
+        else if (rows1.length > 0) eventHeader = eventData[1].name;
+        else if (rows2.length > 0) eventHeader = eventData[2].name;
+
+        let output = eventHeader ? `【${eventHeader}】
+` : "";
+        output += "日付　　月 　火 　水 　木 　金 　土 　日
+";
+
+        allNames.forEach(name => {
+            const r1 = eventData[1].rows.find(r => r.name === name);
+            const r2 = eventData[2].rows.find(r => r.name === name);
+            let symbols = [];
+            for (let i = 0; i < 7; i++) {
+                const c1 = r1 ? r1.checks[i] : false;
+                const c2 = r2 ? r2.checks[i] : false;
+                if (c1 && c2) symbols.push(" ◎ ");
+                else if (c1) symbols.push(" 🔴 ");
+                else if (c2) symbols.push(" 🔵 ");
+                else symbols.push(" － ");
+            }
+            output += `${padName(name)} ${symbols.join('┃')}
+`;
+        });
+
+        output += `
+◎2イベント共通 🔴＝${eventData[1].name} 🔵＝${eventData[2].name}`;
+        const field = document.getElementById('outputText');
+        field.value = output;
+        field.select();
+        document.execCommand('copy');
+        alert("テキスト表を作成しコピーしました。");
+    }
+</script>
+</body>
+</html>
