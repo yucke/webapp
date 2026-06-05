@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>週間ミッション集計エディタ Pro</title>
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <style>
+    :root {
+      --primary: #4f46e5;
+      --bg: #f8fafc;
+      --card: #ffffff;
+      --border: #e2e8f0;
+      --text: #1e293b;
+    }
+
+    body {
+      font-family: "Helvetica Neue", Arial, "Hiragino Kaku Gothic ProN", "Hiragino Sans", Meiryo, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      margin: 0;
+      padding: 20px;
+    }
+
+    .container {
+      max-width: 1000px;
+      margin: 0 auto;
+      background: var(--card);
+      padding: 24px;
+      border-radius: 12px;
+      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+    }
+
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 20px;
+      border-bottom: 2px solid var(--border);
+      padding-bottom: 10px;
+    }
+
+    h2 { margin: 0; font-size: 1.5rem; color: var(--primary); }
+
+    .tabs-container {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      overflow-x: auto;
+      padding-bottom: 8px;
+      margin-bottom: 20px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .tab {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 8px 16px;
+      background: #f1f5f9;
+      border: 1px solid var(--border);
+      border-radius: 8px 8px 0 0;
+      cursor: pointer;
+      white-space: nowrap;
+      font-size: 0.9rem;
+    }
+
+    .tab.active {
+      background: var(--card);
+      border-bottom-color: var(--card);
+      color: var(--primary);
+      font-weight: bold;
+    }
+
+    .add-tab-btn {
+      background: var(--primary);
+      color: white;
+      border: none;
+      width: 32px; height: 32px;
+      border-radius: 50%;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+
+    .event-settings {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 15px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+
+    .event-name-input {
+      padding: 8px;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      width: 200px;
+    }
+
+    .table-wrapper { overflow-x: auto; margin-bottom: 20px; }
+    table { width: 100%; border-collapse: collapse; min-width: 300px; }
+    th, td { border: 1px solid var(--border); padding: 3px; text-align: center; }
+    th { background: #f8fafc; font-size: 0.85rem; width:15px; }
+
+    .mission-input {
+      width: 100%;
+      padding: 6px;
+      border: 1px solid #cbd5e1;
+      border-radius: 4px;
+      box-sizing: border-box;
+    }
+
+    .btn {
+      padding: 8px 16px;
+      border-radius: 6px;
+      border: none;
+      cursor: pointer;
+      font-weight: 500;
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+    }
+
+    .btn-add-row { background: #10b981; color: white; }
+    .btn-remove-row { background: #ef4444; color: white; padding: 4px 8px; }
+    .btn-generate { 
+      background: var(--primary); 
+      color: white; 
+      width: 100%; 
+      padding: 15px; 
+      font-size: 1.1rem;
+    }
+
+    textarea {
+      width: 100%;
+      height: 250px;
+      margin-top: 15px;
+      font-family: monospace;
+      padding: 12px;
+      border-radius: 8px;
+      background: #1e293b;
+      color: #f1f5f9;
+      box-sizing: border-box;
+    }
+  </style>
+</head>
+<body>
+
+<div class="container">
+  <header>
+    <h2>週間タスク表合成エディタ</h2>
+  </header>
+
+  <div class="tabs-container" id="tabs">
+    <button class="add-tab-btn" onclick="addEvent()">
+      <i data-lucide="plus"></i>
+    </button>
+  </div>
+
+  <div id="active-event-editor">
+    <div class="event-settings">
+      <label>イベント名:</label>
+      <input type="text" id="current-event-name" class="event-name-input" oninput="updateEventName(this.value)">
+      <button class="btn btn-add-row" onclick="addRow()">
+        <i data-lucide="list-plus"></i> ミッション追加
+      </button>
+    </div>
+
+    <div class="table-wrapper">
+      <table>
+        <thead>
+          <tr>
+            <th style="width: 50px;">Msn</th>
+            <th>月</th><th>火</th><th>水</th><th>木</th><th>金</th><th>土</th><th>日</th>
+            <th style="width: 40px;">削除</th>
+          </tr>
+        </thead>
+        <tbody id="mission-body"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <button class="btn btn-generate" onclick="generateOutput()">
+    <i data-lucide="file-text"></i> テキスト表を作成してコピー
+  </button>
+
+  <textarea id="outputText" readonly placeholder="ここに出力結果が表示されます..."></textarea>
+</div>
+
+<datalist id="mission-list">
+  <option value="総力"></option><option value="火晶"></option>
+  <option value="加速"></option><option value="訓練"></option>
+  <option value="欠片"></option><option value="領主装"></option>
+  <option value="領主宝"></option><option value="英装備"></option>
+  <option value="採集"></option><option value="ラキル"></option>
+  <option value="ペット"></option><option value="鍵募集"></option>
+  <option value="野巨獣"></option><option value="ダイヤ"></option>
+</datalist>
+
+<script>
+  let events = [{ id: Date.now(), name: "イベント 1", missions: {} }];
+  let activeEventId = events[0].id;
+  const defaultMissions = ["総力", "火晶", "加速", "訓練", "欠片", "領主装", "領主宝", "英装備", "採集", "ラキル", "ペット", "鍵募集", "野巨獣", "ダイヤ"];
+  
+  const toFullWidth = (num) => String(num).replace(/[0-9]/g, s => String.fromCharCode(s.charCodeAt(0) + 0xFEE0));
+
+  function init() {
+    defaultMissions.forEach(m => {
+      events[0].missions[m] = [false, false, false, false, false, false, false];
+    });
+    renderTabs();
+    renderEditor();
+  }
+
+  function renderTabs() {
+    const tabsContainer = document.getElementById('tabs');
+    const addBtn = tabsContainer.querySelector('.add-tab-btn');
+    tabsContainer.querySelectorAll('.tab').forEach(t => t.remove());
+    
+    events.forEach((ev) => {
+      const tab = document.createElement('div');
+      tab.className = `tab ${ev.id === activeEventId ? 'active' : ''}`;
+      tab.onclick = () => switchEvent(ev.id);
+      tab.innerHTML = `<span>${ev.name}</span>`;
+
+      if (events.length > 1) {
+        const del = document.createElement('span');
+        del.style.marginLeft = "8px";
+        del.innerHTML = '×';
+        del.onclick = (e) => { e.stopPropagation(); removeEvent(ev.id); };
+        tab.appendChild(del);
+      }
+      tabsContainer.insertBefore(tab, addBtn);
+    });
+    addBtn.style.display = events.length >= 9 ? 'none' : 'flex';
+    lucide.createIcons();
+  }
+
+  function renderEditor() {
+    const ev = events.find(e => e.id === activeEventId);
+    document.getElementById('current-event-name').value = ev.name;
+    const tbody = document.getElementById('mission-body');
+    tbody.innerHTML = '';
+    Object.keys(ev.missions).forEach(name => {
+      tbody.appendChild(createRowElement(name, ev.missions[name]));
+    });
+  }
+
+  function createRowElement(name, checkArray) {
+    const tr = document.createElement('tr');
+    let html = `<td><input type="text" class="mission-input" value="${name}" list="mission-list" onchange="saveCurrentState()"></td>`;
+    checkArray.forEach((checked) => {
+      html += `<td><input type="checkbox" class="day-check" ${checked ? 'checked' : ''} onchange="saveCurrentState()"></td>`;
+    });
+    html += `<td><button class="btn btn-remove-row" onclick="this.parentElement.parentElement.remove(); saveCurrentState();">×</button></td>`;
+    tr.innerHTML = html;
+    return tr;
+  }
+
+  function saveCurrentState() {
+    const ev = events.find(e => e.id === activeEventId);
+    if(!ev) return;
+    const rows = document.querySelectorAll('#mission-body tr');
+    ev.missions = {};
+    rows.forEach(row => {
+      const name = row.querySelector('.mission-input').value;
+      if (!name) return;
+      ev.missions[name] = Array.from(row.querySelectorAll('.day-check')).map(c => c.checked);
+    });
+  }
+
+  function addEvent() {
+    if (events.length >= 9) return;
+    const newId = Date.now();
+    // 直前のイベントのミッション構成を初期値としてコピー
+    const prevMissions = JSON.parse(JSON.stringify(events[events.length - 1].missions));
+    events.push({ id: newId, name: `イベント ${events.length + 1}`, missions: prevMissions });
+    activeEventId = newId;
+    renderTabs();
+    renderEditor();
+  }
+
+  function removeEvent(id) {
+    events = events.filter(e => e.id !== id);
+    if (activeEventId === id) activeEventId = events[0].id;
+    renderTabs();
+    renderEditor();
+  }
+
+  function switchEvent(id) {
+    saveCurrentState();
+    activeEventId = id;
+    renderTabs();
+    renderEditor();
+  }
+
+  function updateEventName(val) {
+    const ev = events.find(e => e.id === activeEventId);
+    ev.name = val;
+    renderTabs();
+  }
+
+  function addRow() {
+    const tbody = document.getElementById('mission-body');
+    tbody.appendChild(createRowElement("", [false, false, false, false, false, false, false]));
+  }
+
+  function generateOutput() {
+    saveCurrentState();
+    const allNames = new Set();
+    events.forEach(ev => Object.keys(ev.missions).forEach(n => allNames.add(n)));
+    
+    let output = "日付　月　火　水　木　金　土　日 \n";
+    allNames.forEach(name => {
+      let rowText = (name + "　　").slice(0, 3);
+      let dayCounts = [];
+      for (let i = 0; i < 7; i++) {
+        let count = 0;
+        events.forEach(ev => { if (ev.missions[name] && ev.missions[name][i]) count++; });
+        dayCounts.push(count === 0 ? "　" : toFullWidth(count));
+      }
+      output += `${rowText} ${dayCounts.join('┃')} \n`;
+    });
+
+    const outputField = document.getElementById('outputText');
+    outputField.value = output;
+    outputField.select();
+    navigator.clipboard.writeText(output).then(() => alert("コピーしました！"));
+  }
+
+  window.onload = init;
+</script>
+</body>
+</html>
