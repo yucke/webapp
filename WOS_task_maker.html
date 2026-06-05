@@ -321,9 +321,13 @@
   function addEvent() {
     if (events.length >= 9) return;
     const newId = Date.now();
-    // 直前のイベントのミッション構成を初期値としてコピー
-    const prevMissions = JSON.parse(JSON.stringify(events[events.length - 1].missions));
-    events.push({ id: newId, name: `イベント ${events.length + 1}`, missions: prevMissions });
+    // 直前のイベントのミッション名をコピー（チェック状態は全てfalseにリセット）
+    const prevMissions = events[events.length - 1].missions;
+    const newMissions = {};
+    Object.keys(prevMissions).forEach(name => {
+      newMissions[name] = [false, false, false, false, false, false, false];
+    });
+    events.push({ id: newId, name: `イベント ${events.length + 1}`, missions: newMissions });
     activeEventId = newId;
     renderTabs();
     renderEditor();
