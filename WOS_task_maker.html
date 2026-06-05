@@ -315,6 +315,21 @@
     
     let output = "日付　月　火　水　木　金　土　日 \n";
     allNames.forEach(name => {
+      // このミッションが全イベント通じてチェックされているかを確認
+      let hasAnyCheck = false;
+      for (let i = 0; i < 7; i++) {
+        for (let ev of events) {
+          if (ev.missions[name] && ev.missions[name][i]) {
+            hasAnyCheck = true;
+            break;
+          }
+        }
+        if (hasAnyCheck) break;
+      }
+      
+      // チェックが1つもない場合はスキップ
+      if (!hasAnyCheck) return;
+      
       let rowText = (name + "　　").slice(0, 3);
       let dayCounts = [];
       for (let i = 0; i < 7; i++) {
