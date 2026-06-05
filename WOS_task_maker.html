@@ -244,7 +244,7 @@
     return width;
   };
 
-  // 文字列を指定の表示幅��詰める
+  // 文字列を指定の表示幅に詰める
   const padStringToWidth = (str, targetWidth) => {
     let currentWidth = getStringWidth(str);
     let padding = targetWidth - currentWidth;
@@ -421,8 +421,7 @@
       output += `${rowText}${dayCounts.join('┃')} \n`;
     });
 
-    // 凡例を追加
-    output += "【凡例】　";
+    // 凡例を追加（1行空けずに次の行に出力）
     let legendItems = [];
     for (let i = 0; i < symbols.length; i++) {
       const eventCount = maxCount - i;
@@ -430,8 +429,7 @@
         legendItems.push(`${symbols[i]}:${eventCount}イベント共通`);
       }
     }
-    output += legendItems.join(' ');
-    output += " \n";
+    output += legendItems.join(' ') + " \n";
 
     const outputField = document.getElementById('outputText');
     outputField.value = output;
