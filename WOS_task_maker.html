@@ -244,7 +244,7 @@
     return width;
   };
 
-  // 文字列を指定の表示幅に詰める
+  // 文字列を指定の表示幅��詰める
   const padStringToWidth = (str, targetWidth) => {
     let currentWidth = getStringWidth(str);
     let padding = targetWidth - currentWidth;
@@ -422,14 +422,16 @@
     });
 
     // 凡例を追加
-    output += "\n【凡例】\n";
+    output += "【凡例】　";
+    let legendItems = [];
     for (let i = 0; i < symbols.length; i++) {
       const eventCount = maxCount - i;
       if (eventCount > 0) {
-        output += `${symbols[i]}:${eventCount}イベント共通 `;
+        legendItems.push(`${symbols[i]}:${eventCount}イベント共通`);
       }
     }
-    output += "\n";
+    output += legendItems.join(' ');
+    output += " \n";
 
     const outputField = document.getElementById('outputText');
     outputField.value = output;
