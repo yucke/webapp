@@ -134,6 +134,20 @@
       font-size: 1.1rem;
     }
 
+    .symbol-settings {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 15px;
+      align-items: center;
+    }
+
+    .symbol-input {
+      padding: 8px;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      width: 150px;
+    }
+
     textarea {
       width: 100%;
       height: 250px;
@@ -183,6 +197,11 @@
     </div>
   </div>
 
+  <div class="symbol-settings">
+    <label>出力記号（大きい順）:</label>
+    <input type="text" id="symbol-input" class="symbol-input" placeholder="例: ◎◯△" value="◎◯△">
+  </div>
+
   <button class="btn btn-generate" onclick="generateOutput()">
     <i data-lucide="file-text"></i> テキスト表を作成してコピー
   </button>
@@ -206,6 +225,33 @@
   const defaultMissions = ["総力", "火晶", "加速", "訓練", "欠片", "領主装", "領主宝", "英装備", "採集", "ラキル", "ペット", "鍵募集", "野巨獣", "ダイヤ"];
   
   const toFullWidth = (num) => String(num).replace(/[0-9]/g, s => String.fromCharCode(s.charCodeAt(0) + 0xFEE0));
+
+  // 文字列の表示幅を計算（全角=2、半角=1）
+  const getStringWidth = (str) => {
+    let width = 0;
+    for (let char of str) {
+      const code = char.charCodeAt(0);
+      // 全角判定（日本語、全角記号など）
+      if ((code >= 0x2E80 && code <= 0x9FFF) || // CJK統合漢字
+          (code >= 0x3040 && code <= 0x309F) || // ひらがな
+          (code >= 0x30A0 && code <= 0x30FF) || // カタカナ
+          (code >= 0xFF00 && code <= 0xFFEF)) { // 全角英数・記号
+        width += 2;
+      } else {
+        width += 1;
+      }
+    }
+    return width;
+  };
+
+  // 文字列を指定の表示幅に詰める
+  const padStringToWidth = (str, targetWidth) => {
+    let currentWidth = getStringWidth(str);
+    let padding = targetWidth - currentWidth;
+    if (padding <= 0) return str.slice(0, targetWidth);
+    // 空白を足す
+    return str + '　'.repeat(Math.ceil(padding / 2)) + ' '.repeat(padding % 2);
+  };
 
   function init() {
     defaultMissions.forEach(m => {
@@ -313,6 +359,36 @@
     const allNames = new Set();
     events.forEach(ev => Object.keys(ev.missions).forEach(n => allNames.add(n)));
     
+    // 最大値を取得
+    let maxCount = 0;
+    allNames.forEach(name => {
+      for (let i = 0; i < 7; i++) {
+        for (let ev of events) {
+          if (ev.missions[name] && ev.missions[name][i]) {
+            let count = 0;
+            events.forEach(e => { if (e.missions[name] && e.missions[name][i]) count++; });
+            maxCount = Math.max(maxCount, count);
+          }
+        }
+      }
+    });
+
+    // 記号を取得
+    const symbolInput = document.getElementById('symbol-input').value;
+    const symbols = Array.from(symbolInput); // 1文字ずつ配列に
+    
+    // 数字を記号に変換する関数
+    const convertToSymbol = (num) => {
+      if (num === 0) return "　";
+      const index = maxCount - num; // 最大値から逆算
+      if (index >= 0 && index < symbols.length) {
+        return symbols[index];
+      } else {
+        // 記号が足りない場合は全角数字を使用
+        return toFullWidth(num);
+      }
+    };
+    
     let output = "日付　月　火　水　木　金　土　日 \n";
     allNames.forEach(name => {
       // このミッションが全イベント通じてチェックされているかを確認
@@ -330,14 +406,15 @@
       // チェックが1つもない場合はスキップ
       if (!hasAnyCheck) return;
       
-      let rowText = (name + "　　").slice(0, 3);
+      // ミッション名を全角3文字幅に揃える（全角=2、半角=1）
+      let rowText = padStringToWidth(name, 6);
       let dayCounts = [];
       for (let i = 0; i < 7; i++) {
         let count = 0;
         events.forEach(ev => { if (ev.missions[name] && ev.missions[name][i]) count++; });
-        dayCounts.push(count === 0 ? "　" : toFullWidth(count));
+        dayCounts.push(convertToSymbol(count));
       }
-      output += `${rowText} ${dayCounts.join('┃')} \n`;
+      output += `${rowText}${dayCounts.join('┃')} \n`;
     });
 
     const outputField = document.getElementById('outputText');
