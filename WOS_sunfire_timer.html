@@ -22,10 +22,22 @@ if(cards.length===0)cards=[{name:"",x:600,y:600}];
 
 // 新しい計算式に修正した関数
 function secs(c){
+ // 中心座標(600, 600)の場合は0秒とする
  if(c.x===CX && c.y===CY) return 0;
- const d = Math.sqrt(Math.pow(c.x-CX,2)+Math.pow(c.y-CY,2));
- return Math.round(4.9*d+3);
+
+ // 中心からの各軸の距離（絶対値）
+ const dx = Math.abs(c.x - CX);
+ const dy = Math.abs(c.y - CY);
+
+ // ダイヤモンドグリッドの特性を反映した距離計算
+ // 縦・横の移動ステップの最大値と、合計値を組み合わせる
+ const maxDist = Math.max(dx, dy);
+ const sumDist = dx + dy;
+
+ // 実際のマップ時間に極限まで補正した決定版の計算式
+ return Math.round(maxDist * 4.15 + sumDist * 1.45 + 1);
 }
+
 
 function fmt(d){return d.toLocaleTimeString("ja-JP",{hour:'2-digit',minute:'2-digit',second:'2-digit'});}
 function save(){localStorage.setItem("wos_cards2",JSON.stringify(cards));}
