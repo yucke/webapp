@@ -40,9 +40,9 @@ function render(){
   div.className=`card card-${i % 5}`;
   div.innerHTML=`<div class=row>
 <input type=text placeholder="名前" value="${c.name}">
-<input type=number placeholder="X" value="${c.x}" min="0" max="1199">
-<input type=number placeholder="Y" value="${c.y}" min="0" max="1199">
-<select>
+X:<input type=number placeholder="X" value="${c.x}" min="0" max="1199">&nbsp;
+Y:<input type=number placeholder="Y" value="${c.y}" min="0" max="1199">
+ペット:<select>
  <option value="0" ${c.buff==0?'selected':''}>バフなし</option>
  <option value="15" ${c.buff==15?'selected':''}>1:15%</option>
  <option value="17" ${c.buff==17?'selected':''}>2:17%</option>
@@ -56,9 +56,9 @@ function render(){
 <button>削除</button></div>
 <div class=grid>
 <div><div class=small>移動時間</div><b class=sec></b></div>
-<div><div class=small>今出発</div><b class=now></b></div>
-<div><div class=small>5分後</div><b class=p5></b></div>
-<div><div class=small>10分後</div><b class=p10></b></div></div>`;
+<div><div class=small>単騎</div><b class=now></b></div>
+<div><div class=small>5分集結</div><b class=p5></b></div>
+<div><div class=small>10分集結</div><b class=p10></b></div></div>`;
   
   const ins=div.querySelectorAll("input");
   const sel=div.querySelector("select");
