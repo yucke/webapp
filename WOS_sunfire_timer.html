@@ -79,16 +79,18 @@ function calcSeconds(c) {
  const dy = c.y - 599;
  const dist = Math.sqrt(dx*dx + dy*dy);
  
- // 1. 先にバフなし状態の「基本秒数」を四捨五入で整数として確定させる（実機の挙動）
+ // 1. ペットバフ無し、島装飾MAX5％、同盟科学MAX5％、ステ有り15%の計25%のバフは前提
  const baseSeconds = Math.round(4.29 * dist + 6);
  
- // 2. その確定した整数に対して、追加バフによる時間短縮を計算する
- const baseBuff = 0.35; 
- const addedBuff = (c.buff || 0) / 100;
- const speedRatio = (1 + baseBuff + addedBuff) / (1 + baseBuff);
+ // ペットバフがない（0%）なら、そのまま時間表の通り
+ if (!c.buff) return baseSeconds;
  
- return Math.round(baseSeconds / speedRatio);
+ // 2. 通常時25%を基準として、追加バフ分の短縮率を計算
+ // 式：基本秒数 * 1.25 / (1.25 + 追加バフ率)
+ const addedBuffRate = c.buff / 100;
+ return Math.round(baseSeconds * (1.25 / (1.25 + addedBuffRate)));
 }
+
 
 
 function updateCard(div,c){
