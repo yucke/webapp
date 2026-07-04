@@ -20,23 +20,21 @@ const CX=600,CY=600;
 let cards=JSON.parse(localStorage.getItem("wos_cards2")||"[]");
 if(cards.length===0)cards=[{name:"",x:600,y:600}];
 
-// 新しい計算式に修正した関数
 function secs(c){
- // 中心座標(600, 600)の場合は0秒とする
- if(c.x===CX && c.y===CY) return 0;
+ // 本当の中心座標(599, 599) の場合は0秒とする
+ if(c.x === 599 && c.y === 599) return 0;
 
- // 中心からの各軸の距離（絶対値）
- const dx = Math.abs(c.x - CX);
- const dy = Math.abs(c.y - CY);
-
- // ダイヤモンドグリッドの特性を反映した距離計算
- // 縦・横の移動ステップの最大値と、合計値を組み合わせる
- const maxDist = Math.max(dx, dy);
- const sumDist = dx + dy;
-
- // 実際のマップ時間に極限まで補正した決定版の計算式
- return Math.round(maxDist * 4.15 + sumDist * 1.45 + 1);
+ // 中心からの距離の差分を計算
+ const dx = c.x - 599;
+ const dy = c.y - 599;
+ 
+ // 直線距離（ユークリッド距離）を計算
+ const dist = Math.sqrt(dx * dx + dy * dy);
+ 
+ // 傾き4.29、切片6で計算（四捨五入）
+ return Math.round(4.29 * dist + 6);
 }
+
 
 
 function fmt(d){return d.toLocaleTimeString("ja-JP",{hour:'2-digit',minute:'2-digit',second:'2-digit'});}
