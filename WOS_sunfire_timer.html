@@ -1,52 +1,62 @@
-<!DOCTYPE html><html lang="ja"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>WOS Sunfire</title>
+
+<!doctype html><html lang="ja"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>WOS_sunfire</title>
 <style>
-body{font-family:Arial,sans-serif;background:#121212;color:#eee;margin:0;padding:16px}
-h1{font-size:22px}#clock{font-size:20px;margin:10px 0}
-button{padding:10px 14px;margin:4px;border:0;border-radius:8px;background:#2d7ef7;color:#fff}
-.card{background:#1e1e1e;border-radius:12px;padding:12px;margin:12px 0}
+body{font-family:Arial;background:#111;color:#eee;padding:16px}
+.card{background:#222;padding:12px;border-radius:10px;margin:10px 0}
 .row{display:flex;gap:8px;flex-wrap:wrap}
-input{background:#333;color:#fff;border:1px solid #555;border-radius:6px;padding:6px}
-.name{width:120px}.num{width:70px}.grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px}.small{font-size:.8em;color:#aaa}
-.del{background:#b33}
+input{padding:6px;background:#333;color:#fff;border:1px solid #555;border-radius:6px}
+button{padding:8px 12px;margin:4px}
+.grid{display:grid;grid-template-columns:repeat(2,1fr);gap:6px;margin-top:8px}
+.small{font-size:.8em;color:#aaa}
 </style></head><body>
-<h1>WOS Sunfire 到着時間計算</h1>
+<h2>WOS Sunfire</h2>
 <div id="clock"></div>
-<button onclick="addCard()">＋カード追加</button>
-<button onclick="sortArrival()">到着時刻順に並び替え</button>
+<button id="add">＋カード追加</button>
+<button id="sort">到着時刻順に並び替え</button>
 <div id="cards"></div>
 <script>
 const CX=600,CY=600;
-let cards=JSON.parse(localStorage.getItem("wos_cards")||"[]");
-if(cards.length===0)cards=[{id:Date.now(),name:"",x:600,y:600}];
-function sec(x,y){const dx=Math.abs(x-CX),dy=Math.abs(y-CY),d=Math.max(dx,dy);return Math.round(d<=6?d*6:36+(d-6)*4.2);}
-function fmt(t){return t.toLocaleTimeString("ja-JP",{hour:"2-digit",minute:"2-digit",second:"2-digit"});}
-function at(s,m){return fmt(new Date(Date.now()+m*60000+s*1000));}
-function save(){localStorage.setItem("wos_cards",JSON.stringify(cards));}
-function update(i,k,v){cards[i][k]=k=="name"?v:Number(v);save();render();}
-function addCard(){cards.push({id:Date.now()+Math.random(),name:"",x:600,y:600});save();render();}
-function delCard(i){cards.splice(i,1);if(!cards.length)addCard();save();render();}
-function sortArrival(){cards.sort((a,b)=>sec(a.x,a.y)-sec(b.x,b.y));save();render();}
+let cards=JSON.parse(localStorage.getItem("wos_cards2")||"[]");
+if(cards.length===0)cards=[{name:"",x:600,y:600}];
+function secs(c){const d=Math.max(Math.abs(c.x-CX),Math.abs(c.y-CY));return Math.round(d<=6?d*6:36+(d-6)*4.2);}
+function fmt(d){return d.toLocaleTimeString("ja-JP",{hour:'2-digit',minute:'2-digit',second:'2-digit'});}
+function save(){localStorage.setItem("wos_cards2",JSON.stringify(cards));}
 function render(){
-let h="";
-cards.forEach((c,i)=>{
-let s=sec(+c.x||0,+c.y||0);
-h+=`<div class="card">
-<div class="row">
-<input class="name" placeholder="名前" value="${c.name||""}" oninput="update(${i},'name',this.value)">
-<input class="num" type="number" value="${c.x}" oninput="update(${i},'x',this.value)">
-<input class="num" type="number" value="${c.y}" oninput="update(${i},'y',this.value)">
-<button class="del" onclick="delCard(${i})">削除</button>
-</div>
-<div class="grid">
-<div><div class="small">移動時間</div><b>${s} 秒</b></div>
-<div><div class="small">今出発</div><b>${at(s,0)}</b></div>
-<div><div class="small">5分後</div><b>${at(s,5)}</b></div>
-<div><div class="small">10分後</div><b>${at(s,10)}</b></div>
-</div>
-</div>`;
-});
-document.getElementById("cards").innerHTML=h;
+ const wrap=document.getElementById("cards");wrap.innerHTML="";
+ cards.forEach((c,i)=>{
+  const div=document.createElement("div");div.className="card";
+  div.innerHTML=`<div class=row>
+<input class=name placeholder="名前" value="${c.name}">
+<input type=number value="${c.x}">
+<input type=number value="${c.y}">
+<button>削除</button></div>
+<div class=grid>
+<div><div class=small>移動時間</div><b class=sec></b></div>
+<div><div class=small>今出発</div><b class=now></b></div>
+<div><div class=small>5分後</div><b class=p5></b></div>
+<div><div class=small>10分後</div><b class=p10></b></div></div>`;
+  const ins=div.querySelectorAll("input");
+  ins[0].oninput=e=>{cards[i].name=e.target.value;save();}
+  ins[1].oninput=e=>{cards[i].x=+e.target.value;save();updateCard(div,cards[i]);}
+  ins[2].oninput=e=>{cards[i].y=+e.target.value;save();updateCard(div,cards[i]);}
+  div.querySelector("button").onclick=()=>{cards.splice(i,1);if(!cards.length)cards=[{name:"",x:600,y:600}];save();render();}
+  wrap.appendChild(div);updateCard(div,c);
+ });
 }
-setInterval(()=>{document.getElementById("clock").textContent="現在時刻: "+fmt(new Date());render();},1000);
-render();
+function updateCard(div,c){
+ let s=secs(c),n=Date.now();
+ div.querySelector(".sec").textContent=s+" 秒";
+ div.querySelector(".now").textContent=fmt(new Date(n+s*1000));
+ div.querySelector(".p5").textContent=fmt(new Date(n+5*60000+s*1000));
+ div.querySelector(".p10").textContent=fmt(new Date(n+10*60000+s*1000));
+}
+function tick(){
+ document.getElementById("clock").textContent="現在時刻: "+fmt(new Date());
+ document.querySelectorAll(".card").forEach((d,i)=>updateCard(d,cards[i]));
+}
+document.getElementById("add").onclick=()=>{cards.push({name:"",x:600,y:600});save();render();}
+document.getElementById("sort").onclick=()=>{cards.sort((a,b)=>secs(a)-secs(b));save();render();}
+render();tick();setInterval(tick,1000);
 </script></body></html>
