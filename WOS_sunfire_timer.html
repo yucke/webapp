@@ -1,14 +1,21 @@
 <!doctype html><html lang="ja"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>WOS_王城集結着弾時間計算</title>
+<title>WOS_王城集結着弾時刻計算</title>
 <style>
 body{font-family:Arial;background:#111;color:#eee;padding:16px}
-.card{background:#222;padding:12px;border-radius:10px;margin:10px 0}
-.row{display:flex;gap:8px;flex-wrap:wrap}
-input{padding:6px;background:#333;color:#fff;border:1px solid #555;border-radius:6px}
-input{padding:6px;background:#333;color:#fff;border:1px solid #555;border-radius:6px}
-input[type=number]{width: 40px;} 
-button{padding:8px 12px;margin:4px}
+.card{padding:12px;border-radius:10px;margin:10px 0}
+.card-0{background:#3a2222;border-left:5px solid #ff6b6b}
+.card-1{background:#222f3a;border-left:5px solid #54a0ff}
+.card-2{background:#1e3226;border-left:5px solid #1dd1a1}
+.card-3{background:#2d223a;border-left:5px solid #9c88ff}
+.card-4{background:#3a3022;border-left:5px solid #feca57}
+
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+input[type=text]{padding:6px;background:rgba(0,0,0,0.3);color:#fff;border:1px solid #555;border-radius:6px}
+input[type=number]{padding:6px;background:rgba(0,0,0,0.3);color:#fff;border:1px solid #555;border-radius:6px;width:40px}
+select{padding:6px;background:#333;color:#fff;border:1px solid #555;border-radius:6px}
+button{padding:8px 12px;margin:4px;background:#444;color:#fff;border:none;border-radius:4px;cursor:pointer}
+button:hover{background:#555}
 .grid{display:grid;grid-template-columns:repeat(2,1fr);gap:6px;margin-top:8px}
 .small{font-size:.8em;color:#aaa}
 </style></head><body>
@@ -19,62 +26,84 @@ button{padding:8px 12px;margin:4px}
 <div id="cards"></div>
 <script>
 const CX=600,CY=600;
-let cards=JSON.parse(localStorage.getItem("wos_cards2")||"[]");
-if(cards.length===0)cards=[{name:"",x:600,y:600}];
+let cards=JSON.parse(localStorage.getItem("wos_cards3")||"[]");
+if(cards.length===0)cards=[{name:"",x:600,y:600,buff:0}];
 
-function secs(c){
- // 本当の中心座標(599, 599) の場合は0秒とする
- if(c.x === 599 && c.y === 599) return 0;
+function fmt(d){return d.toLocaleTimeString();}
+function save(){localStorage.setItem("wos_cards3",JSON.stringify(cards));}
 
- // 中心からの距離の差分を計算
- const dx = c.x - 599;
- const dy = c.y - 599;
- 
- // 直線距離（ユークリッド距離）を計算
- const dist = Math.sqrt(dx * dx + dy * dy);
- 
- // 傾き4.29、切片6で計算（四捨五入）
- return Math.round(4.29 * dist + 6);
-}
-
-
-
-function fmt(d){return d.toLocaleTimeString("ja-JP",{hour:'2-digit',minute:'2-digit',second:'2-digit'});}
-function save(){localStorage.setItem("wos_cards2",JSON.stringify(cards));}
 function render(){
  const wrap=document.getElementById("cards");wrap.innerHTML="";
  cards.forEach((c,i)=>{
-  const div=document.createElement("div");div.className="card";
+  if(c.buff === undefined) c.buff = 0; // 互換性維持
+  const div=document.createElement("div");
+  div.className=`card card-${i % 5}`;
   div.innerHTML=`<div class=row>
-<input class=name placeholder="名前" value="${c.name}">
-X<input type=number placeholder="X" value="${c.x}" min="0" max="1199">
-Y<input type=number placeholder="Y" value="${c.y}" min="0" max="1199">
+<input type=text placeholder="名前" value="${c.name}">
+<input type=number placeholder="X" value="${c.x}" min="0" max="1199">
+<input type=number placeholder="Y" value="${c.y}" min="0" max="1199">
+<select>
+ <option value="0" ${c.buff==0?'selected':''}>バフなし</option>
+ <option value="15" ${c.buff==15?'selected':''}>15%</option>
+ <option value="17" ${c.buff==17?'selected':''}>17%</option>
+ <option value="19" ${c.buff==19?'selected':''}>19%</option>
+ <option value="21" ${c.buff==21?'selected':''}>21%</option>
+ <option value="23" ${c.buff==23?'selected':''}>23%</option>
+ <option value="25" ${c.buff==25?'selected':''}>25%</option>
+ <option value="27" ${c.buff==27?'selected':''}>27%</option>
+ <option value="30" ${c.buff==30?'selected':''}>30%</option>
+</select>
 <button>削除</button></div>
 <div class=grid>
 <div><div class=small>移動時間</div><b class=sec></b></div>
 <div><div class=small>今出発</div><b class=now></b></div>
 <div><div class=small>5分後</div><b class=p5></b></div>
 <div><div class=small>10分後</div><b class=p10></b></div></div>`;
+  
   const ins=div.querySelectorAll("input");
+  const sel=div.querySelector("select");
+  
   ins[0].oninput=e=>{cards[i].name=e.target.value;save();}
   ins[1].oninput=e=>{cards[i].x=+e.target.value;save();updateCard(div,cards[i]);}
   ins[2].oninput=e=>{cards[i].y=+e.target.value;save();updateCard(div,cards[i]);}
-  div.querySelector("button").onclick=()=>{cards.splice(i,1);if(!cards.length)cards=[{name:"",x:600,y:600}];save();render();}
+  sel.onchange=e=>{cards[i].buff=+e.target.value;save();updateCard(div,cards[i]);}
+  
+  div.querySelector("button").onclick=()=>{cards.splice(i,1);if(!cards.length)cards=[{name:"",x:600,y:600,buff:0}];save();render();}
   wrap.appendChild(div);updateCard(div,c);
  });
 }
+
+function calcSeconds(c) {
+ if (c.x === 599 && c.y === 599) return 0;
+ const dx = c.x - 599;
+ const dy = c.y - 599;
+ const dist = Math.sqrt(dx*dx + dy*dy);
+ // 基本の行軍時間（バフ0%の時の時間）
+ const baseSeconds = 4.29 * dist + 6;
+ // 移動速度上昇バフの適用 (時間 = 基本時間 / (1 + バフ割合))
+ const buffRate = (c.buff || 0) / 100;
+ return Math.round(baseSeconds / (1 + buffRate));
+}
+
 function updateCard(div,c){
- let s=secs(c),n=Date.now();
+ const s = calcSeconds(c);
+ let n=Date.now();
  div.querySelector(".sec").textContent=s+" 秒";
  div.querySelector(".now").textContent=fmt(new Date(n+s*1000));
  div.querySelector(".p5").textContent=fmt(new Date(n+5*60000+s*1000));
  div.querySelector(".p10").textContent=fmt(new Date(n+10*60000+s*1000));
 }
-function tick(){
- document.getElementById("clock").textContent="現在時刻: "+fmt(new Date());
- document.querySelectorAll(".card").forEach((d,i)=>updateCard(d,cards[i]));
-}
-document.getElementById("add").onclick=()=>{cards.push({name:"",x:600,y:600});save();render();}
-document.getElementById("sort").onclick=()=>{cards.sort((a,b)=>secs(a)-secs(b));save();render();}
-render();tick();setInterval(tick,1000);
+
+document.getElementById("add").onclick=()=>{cards.push({name:"",x:600,y:600,buff:0});save();render();};
+document.getElementById("sort").onclick=()=>{
+ cards.sort((a,b)=> calcSeconds(a) - calcSeconds(b));
+ render();
+};
+
+setInterval(()=>{
+ document.getElementById("clock").textContent=fmt(new Date());
+ const divs=document.querySelectorAll(".card");
+ cards.forEach((c,i)=>{if(divs[i])updateCard(divs[i],c);});
+},1000);
+render();
 </script></body></html>
