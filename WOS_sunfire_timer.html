@@ -78,12 +78,18 @@ function calcSeconds(c) {
  const dx = c.x - 599;
  const dy = c.y - 599;
  const dist = Math.sqrt(dx*dx + dy*dy);
- // 基本の行軍時間（バフ0%の時の時間）
- const baseSeconds = 4.29 * dist + 6;
- // 移動速度上昇バフの適用 (時間 = 基本時間 / (1 + バフ割合))
- const buffRate = (c.buff || 0) / 100;
- return Math.round(baseSeconds / (1 + buffRate));
+ 
+ // 1. 先にバフなし状態の「基本秒数」を四捨五入で整数として確定させる（実機の挙動）
+ const baseSeconds = Math.round(4.29 * dist + 6);
+ 
+ // 2. その確定した整数に対して、追加バフによる時間短縮を計算する
+ const baseBuff = 0.35; 
+ const addedBuff = (c.buff || 0) / 100;
+ const speedRatio = (1 + baseBuff + addedBuff) / (1 + baseBuff);
+ 
+ return Math.round(baseSeconds / speedRatio);
 }
+
 
 function updateCard(div,c){
  const s = calcSeconds(c);
