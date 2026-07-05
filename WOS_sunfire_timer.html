@@ -1,64 +1,122 @@
 <!doctype html><html lang="ja"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>WOS_王城集結着弾時刻計算</title>
+<title>WOS_sunfire</title>
 <style>
-body{font-family:Arial;background:#111;color:#eee;padding:16px}
-.card{padding:5px;border-radius:10px;margin:5px 0}
-.card-0{background:#3a2222;border-left:5px solid #ff6b6b}
-.card-1{background:#222f3a;border-left:5px solid #54a0ff}
-.card-2{background:#1e3226;border-left:5px solid #1dd1a1}
-.card-3{background:#2d223a;border-left:5px solid #9c88ff}
-.card-4{background:#3a3022;border-left:5px solid #feca57}
+body{font-family:Arial;background:#111;color:#eee;padding:8px;margin:0;padding-bottom:60px}
+h2{font-size:1.2em;margin:8px 0 4px 0}
+#clock{font-size:0.9em;margin-bottom:8px}
 
-.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
-input[type=text]{padding:3px;background:rgba(0,0,0,0.3);color:#fff;border:1px solid #555;border-radius:6px}
-input[type=number]{padding:3px;background:rgba(0,0,0,0.3);color:#fff;border:1px solid #555;border-radius:6px;width:40px}
-select{padding:3px;background:#333;color:#fff;border:1px solid #555;border-radius:6px}
-button{padding:3px 8px;margin:4px;background:#444;color:#fff;border:none;border-radius:4px;cursor:pointer}
-button:hover{background:#555}
-.grid{display:grid;grid-template-columns:repeat(2,1fr);gap:6px;margin-top:8px}
-.small{font-size:.8em;color:#aaa}
+/* カード全体のスタイル */
+.card{padding:6px;border-radius:6px;margin:8px 0}
+.card-0{background:#3a2222;border-left:4px solid #ff6b6b}
+.card-1{background:#222f3a;border-left:4px solid #54a0ff}
+.card-2{background:#1e3226;border-left:4px solid #1dd1a1}
+.card-3{background:#2d223a;border-left:4px solid #9c88ff}
+.card-4{background:#3a3022;border-left:4px solid #feca57}
+
+/* 削除ボタン専用の行 */
+.row-del{display:flex;justify-content:flex-end;margin-bottom:2px}
+.del-btn{background:none;border:none;color:#aaa;font-size:1.3em;cursor:pointer;padding:2px 8px;line-height:1}
+.del-btn:hover{color:#ff6b6b}
+
+/* 1行目：名前、X、Y */
+.row1{display:flex;gap:6px;align-items:center;margin-bottom:4px}
+/* 2行目：プルダウン */
+.row2{display:flex;margin-bottom:4px}
+
+/* 項目名ラベルのスタイル */
+.label-group{display:flex;align-items:center;gap:2px;font-size:0.85em;color:#ccc;flex-shrink:0}
+.label-group-buff{display:flex;align-items:center;gap:4px;font-size:0.85em;color:#ccc;width:100%}
+
+/* 入力欄・プルダウン */
+input[type=text]{padding:4px;background:rgba(0,0,0,0.3);color:#fff;border:1px solid #555;border-radius:4px;flex:1;min-width:50px;font-size:0.9em}
+input[type=number]{padding:4px;background:rgba(0,0,0,0.3);color:#fff;border:1px solid #555;border-radius:4px;width:40px;font-size:0.9em}
+select{padding:4px;background:#333;color:#fff;border:1px solid #555;border-radius:4px;font-size:0.85em;flex:1}
+
+/* 時刻表示 */
+.grid{display:flex;flex-direction:column;gap:3px;font-size:0.9em;background:rgba(0,0,0,0.2);padding:4px 6px;border-radius:4px}
+.time-box{display:flex;justify-content:flex-start;align-items:center;gap:8px;border-bottom:1px solid rgba(255,255,255,0.05);padding-bottom:2px}
+.time-box:last-child{border-bottom:none;padding-bottom:0}
+
+/* 【修正】将来的なラベル変更を見据え、横幅を 110px に拡張 */
+.small{color:#aaa;font-size:0.85em;width:110px;display:inline-block;flex-shrink:0;box-sizing:border-box}
+.sec-display{font-weight:bold;color:#fff;background:rgba(255,255,255,0.1);padding:0 4px;border-radius:3px;font-size:0.85em}
+.time-val{font-weight:bold;font-family:monospace;font-size:1.05em}
+
+/* 操作用メインボタン */
+.btn-group{margin:8px 0}
+button.main-btn{padding:8px 12px;margin:4px 4px 4px 0;background:#444;color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:0.9em}
+button.main-btn:hover{background:#555}
 </style></head><body>
 <h2>WOS Sunfire</h2>
 <div id="clock"></div>
-<button id="add">＋カード追加</button>
-<button id="sort">到着時刻順に並び替え</button>
+
+<div class="btn-group">
+ <button id="add" class="main-btn">＋カード追加</button>
+ <button id="sort" class="main-btn">到着順ソート</button>
+</div>
+
 <div id="cards"></div>
+
+<div class="btn-group">
+ <button id="add-bottom" class="main-btn">＋カード追加</button>
+</div>
+
 <script>
-const CX=600,CY=600;
+const CX=599,CY=599;
 let cards=JSON.parse(localStorage.getItem("wos_cards3")||"[]");
 if(cards.length===0)cards=[{name:"",x:600,y:600,buff:0}];
 
-function fmt(d){return d.toLocaleTimeString();}
+function fmt(d){return d.toLocaleTimeString("ja-JP",{hour:'2-digit',minute:'2-digit',second:'2-digit'});}
 function save(){localStorage.setItem("wos_cards3",JSON.stringify(cards));}
 
 function render(){
  const wrap=document.getElementById("cards");wrap.innerHTML="";
  cards.forEach((c,i)=>{
-  if(c.buff === undefined) c.buff = 0; // 互換性維持
+  if(c.buff === undefined) c.buff = 0;
   const div=document.createElement("div");
   div.className=`card card-${i % 5}`;
-  div.innerHTML=`<div class=row>
-<input type=text placeholder="名前" value="${c.name}">
-X:<input type=number placeholder="X" value="${c.x}" min="0" max="1199">&nbsp;
-Y:<input type=number placeholder="Y" value="${c.y}" min="0" max="1199">
-ペット:<select>
- <option value="0" ${c.buff==0?'selected':''}>バフなし</option>
- <option value="15" ${c.buff==15?'selected':''}>1:15%</option>
- <option value="17" ${c.buff==17?'selected':''}>2:17%</option>
- <option value="19" ${c.buff==19?'selected':''}>3:19%</option>
- <option value="21" ${c.buff==21?'selected':''}>4:21%</option>
- <option value="23" ${c.buff==23?'selected':''}>5:23%</option>
- <option value="25" ${c.buff==25?'selected':''}>6:25%</option>
- <option value="27" ${c.buff==27?'selected':''}>7:27%</option>
- <option value="30" ${c.buff==30?'selected':''}>8:30%</option>
-</select>
-<button>削除</button></div>
+  div.innerHTML=`
+<div class=row-del><button class=del-btn>×</button></div>
+<div class=row1>
+ <input type=text placeholder="名前" value="${c.name}">
+ <div class=label-group>X:<input type=number value="${c.x}" min="0" max="1199"></div>
+ <div class=label-group>Y:<input type=number value="${c.y}" min="0" max="1199"></div>
+</div>
+<div class=row2>
+ <div class=label-group-buff>
+  <span>ユキヒョウ:</span>
+  <select>
+   <option value="0" ${c.buff==0?'selected':''}>通常 (追加なし)</option>
+   <option value="15" ${c.buff==15?'selected':''}>+15%</option>
+   <option value="17" ${c.buff==17?'selected':''}>+17%</option>
+   <option value="19" ${c.buff==19?'selected':''}>+19%</option>
+   <option value="21" ${c.buff==21?'selected':''}>+21%</option>
+   <option value="23" ${c.buff==23?'selected':''}>+23%</option>
+   <option value="25" ${c.buff==25?'selected':''}>+25%</option>
+   <option value="27" ${c.buff==27?'selected':''}>+27%</option>
+   <option value="30" ${c.buff==30?'selected':''}>+30%</option>
+  </select>
+ </div>
+</div>
 <div class=grid>
-<div><div class=small>移動時間</div><b class=sec></b></div>
-<div><div class=small>単騎</div><b class=now></b></div>
-<div><div class=small>5分集結</div><b class=p5></b></div>
-<div><div class=small>10分集結</div><b class=p10></b></div></div>`;
+ <div class=time-box>
+  <span class=small>移動時間:</span>
+  <b class="sec sec-display"></b>
+ </div>
+ <div class=time-box>
+  <span class=small>今出発:</span>
+  <b class="now time-val"></b>
+ </div>
+ <div class=time-box>
+  <span class=small>5分後出発:</span>
+  <b class="p5 time-val"></b>
+ </div>
+ <div class=time-box>
+  <span class=small>10分後出発:</span>
+  <b class="p10 time-val"></b>
+ </div>
+</div>`;
   
   const ins=div.querySelectorAll("input");
   const sel=div.querySelector("select");
@@ -68,7 +126,7 @@ Y:<input type=number placeholder="Y" value="${c.y}" min="0" max="1199">
   ins[2].oninput=e=>{cards[i].y=+e.target.value;save();updateCard(div,cards[i]);}
   sel.onchange=e=>{cards[i].buff=+e.target.value;save();updateCard(div,cards[i]);}
   
-  div.querySelector("button").onclick=()=>{cards.splice(i,1);if(!cards.length)cards=[{name:"",x:600,y:600,buff:0}];save();render();}
+  div.querySelector(".del-btn").onclick=()=>{cards.splice(i,1);if(!cards.length)cards=[{name:"",x:600,y:600,buff:0}];save();render();}
   wrap.appendChild(div);updateCard(div,c);
  });
 }
@@ -77,21 +135,13 @@ function calcSeconds(c) {
  if (c.x === 599 && c.y === 599) return 0;
  const dx = c.x - 599;
  const dy = c.y - 599;
- const dist = Math.sqrt(dx*dx + dy*dy);
- 
- // 1. ペットバフ無し、島装飾MAX5％、同盟科学MAX5％、ステ有り15%の計25%のバフは前提
+ const dist = Math.sqrt(dx * dx + dy * dy);
  const baseSeconds = Math.round(4.29 * dist + 6);
- 
- // ペットバフがない（0%）なら、そのまま時間表の通り
  if (!c.buff) return baseSeconds;
- 
- // 2. 通常時25%を基準として、追加バフ分の短縮率を計算
- // 式：基本秒数 * 1.25 / (1.25 + 追加バフ率)
  const addedBuffRate = c.buff / 100;
- return Math.round(baseSeconds * (1.25 / (1.25 + addedBuffRate)));
+ const speedRatio = 1.25 / (1.25 + addedBuffRate);
+ return Math.round(baseSeconds * speedRatio);
 }
-
-
 
 function updateCard(div,c){
  const s = calcSeconds(c);
@@ -102,14 +152,21 @@ function updateCard(div,c){
  div.querySelector(".p10").textContent=fmt(new Date(n+10*60000+s*1000));
 }
 
-document.getElementById("add").onclick=()=>{cards.push({name:"",x:600,y:600,buff:0});save();render();};
+function addCard() {
+ cards.push({name:"",x:600,y:600,buff:0});
+ save();
+ render();
+}
+
+document.getElementById("add").onclick = addCard;
+document.getElementById("add-bottom").onclick = addCard;
 document.getElementById("sort").onclick=()=>{
  cards.sort((a,b)=> calcSeconds(a) - calcSeconds(b));
  render();
 };
 
 setInterval(()=>{
- document.getElementById("clock").textContent=fmt(new Date());
+ document.getElementById("clock").textContent="現在時刻: " + fmt(new Date());
  const divs=document.querySelectorAll(".card");
  cards.forEach((c,i)=>{if(divs[i])updateCard(divs[i],c);});
 },1000);
