@@ -1,6 +1,6 @@
 <!doctype html><html lang="ja"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>WOS_sunfire</title>
+<title>WOS_Sunfire Timer</title>
 <style>
 body{font-family:Arial;background:#111;color:#eee;padding:8px;margin:0;padding-bottom:60px}
 h2{font-size:1.2em;margin:8px 0 4px 0}
@@ -35,20 +35,28 @@ select{padding:4px;background:#333;color:#fff;border:1px solid #555;border-radiu
 
 /* 時刻表示 */
 .grid{display:flex;flex-direction:column;gap:3px;font-size:0.9em;background:rgba(0,0,0,0.2);padding:4px 6px;border-radius:4px}
-.time-box{display:flex;justify-content:flex-start;align-items:center;gap:8px;border-bottom:1px solid rgba(255,255,255,0.05);padding-bottom:2px}
+.time-box{display:flex;justify-content:flex-start;align-items:center;gap:8px;border-bottom:1px solid rgba(255,255,255,0.05);padding-bottom:2px;cursor:pointer;-webkit-user-select:none;user-select:none}
 .time-box:last-child{border-bottom:none;padding-bottom:0}
+.time-box:active{background:rgba(255,255,255,0.1)}
 
-/* 【修正】将来的なラベル変更を見据え、横幅を 110px に拡張 */
+/* ロック中（停止中）のスタイル変更 */
+.time-box.locked{background:rgba(255,234,0,0.15);border-radius:3px}
+
 .small{color:#aaa;font-size:0.85em;width:110px;display:inline-block;flex-shrink:0;box-sizing:border-box}
 .sec-display{font-weight:bold;color:#fff;background:rgba(255,255,255,0.1);padding:0 4px;border-radius:3px;font-size:0.85em}
 .time-val{font-weight:bold;font-family:monospace;font-size:1.05em}
+.lock-icon{color:#feca57;margin-left:4px;font-size:0.9em}
 
 /* 操作用メインボタン */
 .btn-group{margin:8px 0}
 button.main-btn{padding:8px 12px;margin:4px 4px 4px 0;background:#444;color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:0.9em}
 button.main-btn:hover{background:#555}
+
+/* コピートースト通知のスタイル */
+#toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:rgba(0,210,161,0.95);color:#fff;padding:8px 16px;border-radius:20px;font-size:0.9em;font-weight:bold;z-index:9999;opacity:0;transition:opacity 0.15s ease;pointer-events:none;box-shadow:0 4px 10px rgba(0,0,0,0.3)}
+#toast.show{opacity:1}
 </style></head><body>
-<h2>WOS 王城着弾時刻を計算</h2>
+<h2>WOS 王城着弾時刻計算</h2>
 <div id="clock"></div>
 
 <div class="btn-group">
@@ -62,18 +70,33 @@ button.main-btn:hover{background:#555}
  <button id="add-bottom" class="main-btn">＋カード追加</button>
 </div>
 
+<div id="toast">コピーしました</div>
+
 <script>
 const CX=599,CY=599;
-let cards=JSON.parse(localStorage.getItem("wos_cards3")||"[]");
-if(cards.length===0)cards=[{name:"",x:600,y:600,buff:0}];
+let cards=JSON.parse(localStorage.getItem("wos_cards4")||"[]");
+if(cards.length===0)cards=[{name:"",x:600,y:600,buff:0,lockNow:null,lockP5:null,lockP10:null}];
 
 function fmt(d){return d.toLocaleTimeString("ja-JP",{hour:'2-digit',minute:'2-digit',second:'2-digit'});}
-function save(){localStorage.setItem("wos_cards3",JSON.stringify(cards));}
+function save(){localStorage.setItem("wos_cards4",JSON.stringify(cards));}
+
+// コピー通知ポップアップを表示する関数（0.8秒間）
+function showToast() {
+ const toast = document.getElementById("toast");
+ toast.classList.add("show");
+ setTimeout(() => {
+  toast.classList.remove("show");
+ }, 800); // 0.8秒後に消去
+}
 
 function render(){
  const wrap=document.getElementById("cards");wrap.innerHTML="";
  cards.forEach((c,i)=>{
   if(c.buff === undefined) c.buff = 0;
+  if(c.lockNow === undefined) c.lockNow = null;
+  if(c.lockP5 === undefined) c.lockP5 = null;
+  if(c.lockP10 === undefined) c.lockP10 = null;
+
   const div=document.createElement("div");
   div.className=`card card-${i % 5}`;
   div.innerHTML=`
@@ -87,11 +110,11 @@ function render(){
  <div class=label-group-buff>
   <span>ユキヒョウ:</span>
   <select>
-   <option value="0" ${c.buff==0?'selected':''}>バフなし</option>
+   <option value="0" ${c.buff==0?'selected':''}>なし</option>
    <option value="15" ${c.buff==15?'selected':''}>Lv1:+15%</option>
    <option value="17" ${c.buff==17?'selected':''}>Lv2:+17%</option>
    <option value="19" ${c.buff==19?'selected':''}>Lv3:+19%</option>
-   <option value="21" ${c.buff==21?'selected':''}>Lv4+21%</option>
+   <option value="21" ${c.buff==21?'selected':''}>Lv4:+21%</option>
    <option value="23" ${c.buff==23?'selected':''}>Lv5:+23%</option>
    <option value="25" ${c.buff==25?'selected':''}>Lv6:+25%</option>
    <option value="27" ${c.buff==27?'selected':''}>Lv7:+27%</option>
@@ -100,21 +123,21 @@ function render(){
  </div>
 </div>
 <div class=grid>
- <div class=time-box>
-  <span class=small>移動時間:</span>
+ <div class="time-box no-lock">
+  <span class=small>行軍時間:</span>
   <b class="sec sec-display"></b>
  </div>
- <div class=time-box>
-  <span class=small>今出発:</span>
-  <b class="now time-val"></b>
+ <div class="time-box t-now">
+  <span class=small>単騎:</span>
+  <b class="now time-val"></b><span class=lock-icon></span>
  </div>
- <div class=time-box>
-  <span class=small>5分後出発:</span>
-  <b class="p5 time-val"></b>
+ <div class="time-box t-p5">
+  <span class=small>5分集結:</span>
+  <b class="p5 time-val"></b><span class=lock-icon></span>
  </div>
- <div class=time-box>
-  <span class=small>10分後出発:</span>
-  <b class="p10 time-val"></b>
+ <div class="time-box t-p10">
+  <span class=small>10分集結:</span>
+  <b class="p10 time-val"></b><span class=lock-icon></span>
  </div>
 </div>`;
   
@@ -126,7 +149,48 @@ function render(){
   ins[2].oninput=e=>{cards[i].y=+e.target.value;save();updateCard(div,cards[i]);}
   sel.onchange=e=>{cards[i].buff=+e.target.value;save();updateCard(div,cards[i]);}
   
-  div.querySelector(".del-btn").onclick=()=>{cards.splice(i,1);if(!cards.length)cards=[{name:"",x:600,y:600,buff:0}];save();render();}
+  // クリップボードコピー＆トースト呼び出し関数
+  const copyToClipboard = (text) => {
+   navigator.clipboard.writeText(text)
+    .then(() => { showToast(); }) // コピー成功時にトーストを表示
+    .catch(err => console.error("コピー失敗", err));
+  };
+
+  // 各時間行のクリックイベント
+  div.querySelector(".t-now").onclick = () => {
+   if (cards[i].lockNow) {
+    cards[i].lockNow = null;
+   } else {
+    const s = calcSeconds(cards[i]);
+    cards[i].lockNow = Date.now() + s * 1000;
+    copyToClipboard(`${cards[i].name || '名前なし'} ${fmt(new Date(cards[i].lockNow))}`);
+   }
+   save(); updateCard(div, cards[i]);
+  };
+
+  div.querySelector(".t-p5").onclick = () => {
+   if (cards[i].lockP5) {
+    cards[i].lockP5 = null;
+   } else {
+    const s = calcSeconds(cards[i]);
+    cards[i].lockP5 = Date.now() + 5 * 60000 + s * 1000;
+    copyToClipboard(`${cards[i].name || '名前なし'} ${fmt(new Date(cards[i].lockP5))}`);
+   }
+   save(); updateCard(div, cards[i]);
+  };
+
+  div.querySelector(".t-p10").onclick = () => {
+   if (cards[i].lockP10) {
+    cards[i].lockP10 = null;
+   } else {
+    const s = calcSeconds(cards[i]);
+    cards[i].lockP10 = Date.now() + 10 * 60000 + s * 1000;
+    copyToClipboard(`${cards[i].name || '名前なし'} ${fmt(new Date(cards[i].lockP10))}`);
+   }
+   save(); updateCard(div, cards[i]);
+  };
+
+  div.querySelector(".del-btn").onclick=()=>{cards.splice(i,1);if(!cards.length)cards=[{name:"",x:600,y:600,buff:0,lockNow:null,lockP5:null,lockP10:null}];save();render();}
   wrap.appendChild(div);updateCard(div,c);
  });
 }
@@ -135,25 +199,63 @@ function calcSeconds(c) {
  if (c.x === 599 && c.y === 599) return 0;
  const dx = c.x - 599;
  const dy = c.y - 599;
+  //城の中心座標までの距離算出
  const dist = Math.sqrt(dx * dx + dy * dy);
+  //実測値を元にしたバフ無し行軍時間を計算
  const baseSeconds = Math.round(4.29 * dist + 6);
  if (!c.buff) return baseSeconds;
  const addedBuffRate = c.buff / 100;
+  //出征速度バフを適用。同盟科学、島装飾、行軍ステ保有前提で25％にユキヒョウのバフを加算する
  const speedRatio = 1.25 / (1.25 + addedBuffRate);
  return Math.round(baseSeconds * speedRatio);
 }
 
 function updateCard(div,c){
  const s = calcSeconds(c);
- let n=Date.now();
- div.querySelector(".sec").textContent=s+" 秒";
- div.querySelector(".now").textContent=fmt(new Date(n+s*1000));
- div.querySelector(".p5").textContent=fmt(new Date(n+5*60000+s*1000));
- div.querySelector(".p10").textContent=fmt(new Date(n+10*60000+s*1000));
+ const curTime = Date.now();
+
+ if (c.lockNow && curTime >= c.lockNow) c.lockNow = null;
+ if (c.lockP5 && curTime >= c.lockP5) c.lockP5 = null;
+ if (c.lockP10 && curTime >= c.lockP10) c.lockP10 = null;
+
+ div.querySelector(".sec").textContent = s + " 秒";
+
+ const boxNow = div.querySelector(".t-now");
+ if (c.lockNow) {
+  boxNow.classList.add("locked");
+  boxNow.querySelector(".now").textContent = fmt(new Date(c.lockNow));
+  boxNow.querySelector(".lock-icon").textContent = "🔒";
+ } else {
+  boxNow.classList.remove("locked");
+  boxNow.querySelector(".now").textContent = fmt(new Date(curTime + s * 1000));
+  boxNow.querySelector(".lock-icon").textContent = "";
+ }
+
+ const boxP5 = div.querySelector(".t-p5");
+ if (c.lockP5) {
+  boxP5.classList.add("locked");
+  boxP5.querySelector(".p5").textContent = fmt(new Date(c.lockP5));
+  boxP5.querySelector(".lock-icon").textContent = "🔒";
+ } else {
+  boxP5.classList.remove("locked");
+  boxP5.querySelector(".p5").textContent = fmt(new Date(curTime + 5 * 60000 + s * 1000));
+  boxP5.querySelector(".lock-icon").textContent = "";
+ }
+
+ const boxP10 = div.querySelector(".t-p10");
+ if (c.lockP10) {
+  boxP10.classList.add("locked");
+  boxP10.querySelector(".p10").textContent = fmt(new Date(c.lockP10));
+  boxP10.querySelector(".lock-icon").textContent = "🔒";
+ } else {
+  boxP10.classList.remove("locked");
+  boxP10.querySelector(".p10").textContent = fmt(new Date(curTime + 10 * 60000 + s * 1000));
+  boxP10.querySelector(".lock-icon").textContent = "";
+ }
 }
 
 function addCard() {
- cards.push({name:"",x:600,y:600,buff:0});
+ cards.push({name:"",x:600,y:600,buff:0,lockNow:null,lockP5:null,lockP10:null});
  save();
  render();
 }
@@ -168,7 +270,7 @@ document.getElementById("sort").onclick=()=>{
 setInterval(()=>{
  document.getElementById("clock").textContent="現在時刻: " + fmt(new Date());
  const divs=document.querySelectorAll(".card");
- cards.forEach((c,i)=>{if(divs[i])updateCard(divs[i],c);});
+ cards.forEach((c,i)=>{if(divs[i])updateCard(divs[i],cards[i]);});
 },1000);
 render();
 </script></body></html>
