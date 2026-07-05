@@ -48,7 +48,7 @@ select{padding:4px;background:#333;color:#fff;border:1px solid #555;border-radiu
 button.main-btn{padding:8px 12px;margin:4px 4px 4px 0;background:#444;color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:0.9em}
 button.main-btn:hover{background:#555}
 </style></head><body>
-<h2>WOS Sunfire</h2>
+<h2>WOS 王城着弾時刻を計算</h2>
 <div id="clock"></div>
 
 <div class="btn-group">
@@ -87,15 +87,15 @@ function render(){
  <div class=label-group-buff>
   <span>ユキヒョウ:</span>
   <select>
-   <option value="0" ${c.buff==0?'selected':''}>通常 (追加なし)</option>
-   <option value="15" ${c.buff==15?'selected':''}>+15%</option>
-   <option value="17" ${c.buff==17?'selected':''}>+17%</option>
-   <option value="19" ${c.buff==19?'selected':''}>+19%</option>
-   <option value="21" ${c.buff==21?'selected':''}>+21%</option>
-   <option value="23" ${c.buff==23?'selected':''}>+23%</option>
-   <option value="25" ${c.buff==25?'selected':''}>+25%</option>
-   <option value="27" ${c.buff==27?'selected':''}>+27%</option>
-   <option value="30" ${c.buff==30?'selected':''}>+30%</option>
+   <option value="0" ${c.buff==0?'selected':''}>バフなし</option>
+   <option value="15" ${c.buff==15?'selected':''}>Lv1:+15%</option>
+   <option value="17" ${c.buff==17?'selected':''}>Lv2:+17%</option>
+   <option value="19" ${c.buff==19?'selected':''}>Lv3:+19%</option>
+   <option value="21" ${c.buff==21?'selected':''}>Lv4+21%</option>
+   <option value="23" ${c.buff==23?'selected':''}>Lv5:+23%</option>
+   <option value="25" ${c.buff==25?'selected':''}>Lv6:+25%</option>
+   <option value="27" ${c.buff==27?'selected':''}>Lv7:+27%</option>
+   <option value="30" ${c.buff==30?'selected':''}>Lv8:+30%</option>
   </select>
  </div>
 </div>
