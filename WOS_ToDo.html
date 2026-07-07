@@ -56,7 +56,7 @@
 
         .form-group {
             margin-bottom: 12px;
-            position: relative; /* カスタムドロップダウンの基準 */
+            position: relative;
         }
 
         .form-group label {
@@ -83,7 +83,6 @@
             text-align: right;
         }
 
-        /* 独自実装の候補リスト（スマホで確実に動くやつ） */
         .custom-suggest-list {
             position: absolute;
             top: 100%;
@@ -96,11 +95,11 @@
             z-index: 999;
             max-height: 200px;
             overflow-y: auto;
-            display: none; /* 初期状態は非表示 */
+            display: none;
         }
 
         .custom-suggest-item {
-            padding: 12px 10px; /* スマホで押しきりやすいサイズ */
+            padding: 12px 10px;
             cursor: pointer;
             border-bottom: 1px solid #eee;
             background: #fff;
@@ -221,6 +220,7 @@
             z-index: 10;
         }
 
+        /* 通常時の編集ボタン */
         .edit-btn {
             position: absolute;
             bottom: 10px;
@@ -238,6 +238,19 @@
             justify-content: center;
             z-index: 10;
             box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        /* 編集中（不活性）状態の編集ボタンのスタイル */
+        .edit-btn:disabled {
+            background-color: rgba(0, 0, 0, 0.4);
+            color: #ffffff;
+            width: auto;             /* 文字を収めるために自動幅に */
+            padding: 0 8px;          /* 左右に少し余白 */
+            font-size: 11px;
+            font-weight: bold;
+            box-shadow: none;
+            opacity: 0.7;
+            cursor: not-allowed;
         }
 
         .toast {
@@ -313,36 +326,30 @@
 
         window.onload = function() {
             renderTasks();
-            setupSuggestion(); // 候補リストの挙動セットアップ
+            setupSuggestion();
             setInterval(renderTasks, 60000); 
         };
 
-        // タップ時に確実に動く候補リストの実装
         function setupSuggestion() {
             const input = document.getElementById('taskName');
             const suggest = document.getElementById('customSuggest');
             const items = suggest.querySelectorAll('.custom-suggest-item');
 
-            // 入力欄がタップ・フォーカスされたらリストを強制表示
             input.addEventListener('focus', function() {
                 suggest.style.display = 'block';
             });
 
-            // リストの項目が選択されたときの処理
             items.forEach(item => {
                 item.addEventListener('mousedown', function(e) {
-                    // inputのblur（フォーカス外れ）より先に処理させるため
                     input.value = this.getAttribute('data-value');
                     suggest.style.display = 'none';
                 });
-                // スマホ用タッチイベント対応
                 item.addEventListener('touchstart', function(e) {
                     input.value = this.getAttribute('data-value');
                     suggest.style.display = 'none';
                 });
             });
 
-            // 入力欄以外の場所を触ったらリストを閉じる
             document.addEventListener('click', function(e) {
                 if (e.target !== input && !suggest.contains(e.target)) {
                     suggest.style.display = 'none';
@@ -421,6 +428,9 @@
             submitBtn.classList.add('update-mode-btn');
 
             window.scrollTo({ top: 0, behavior: 'smooth' });
+            
+            // 編集対象が変わったので、ボタンの不活性表示を反映するために再描画
+            renderTasks();
         }
 
         function clearForm() {
@@ -435,6 +445,8 @@
             const submitBtn = document.getElementById('submitBtn');
             submitBtn.textContent = 'タスクを追加';
             submitBtn.classList.remove('update-mode-btn');
+            
+            renderTasks();
         }
 
         function deleteTask(id, event) {
@@ -559,6 +571,9 @@
                     countdownText += `${m}分`;
                 }
 
+                // 編集中のタスクかどうかの判定
+                const isCurrentlyEditing = (task.id === editingTaskId);
+
                 card.innerHTML = `
                     <div class="task-header">
                         <div class="task-title">${escapeHtml(task.name)}</div>
@@ -566,7 +581,11 @@
                     </div>
                     <div class="task-time-info">期限: ${textDeadline}</div>
                     <div class="task-countdown">${countdownText}</div>
-                    <button class="edit-btn" onclick="startEdit(${task.id}, event)">✏️</button>
+                    <button class="edit-btn" 
+                            onclick="startEdit(${task.id}, event)" 
+                            ${isCurrentlyEditing ? 'disabled' : ''}>
+                        ${isCurrentlyEditing ? '編集中…' : '✏️'}
+                    </button>
                 `;
 
                 listContainer.appendChild(card);
