@@ -289,30 +289,29 @@
             <label>タスク名</label>
             <input type="text" id="taskName" placeholder="タップして選択、または直接入力" autocomplete="off">
             <div id="customSuggest" class="custom-suggest-list">
-                <div class="custom-suggest-item" data-value="デイリーミッション">デイリーミッション</div>
-                <div class="custom-suggest-item" data-value="ウィークリーミッション">ウィークリーミッション</div>
-                <div class="custom-suggest-item" data-value="スタミナ全回復">スタミナ全回復</div>
+                <div class="custom-suggest-item" data-value="ステーション保護切れ">ステーション保護切れ</div>
+                <div class="custom-suggest-item" data-value="交換期限">交換期限</div>
+                <div class="custom-suggest-item" data-value="エントリー期限">エントリー期限</div>
                 <div class="custom-suggest-item" data-value="イベント終了">イベント終了</div>
-                <div class="custom-suggest-item" data-value="派遣・遠征完了">派遣・遠征完了</div>
             </div>
         </div>
 
         <div class="form-group">
             <label>残り時間から期限を設定</label>
             <div class="input-row">
-                <input type="number" id="inputDays" min="0" placeholder="日"> 日
-                <input type="number" id="inputHours" min="0" placeholder="時"> 時
-                <input type="number" id="inputMins" min="0" placeholder="分"> 分
+                <input type="number" id="inputDays" min="0" placeholder="日"> d
+                <input type="number" id="inputHours" min="0" placeholder="時"> h
+                <input type="number" id="inputMins" min="0" placeholder="分"> m
                 <button type="button" class="calc-btn" onclick="setDeadlineFromRemaining()">⏰</button>
             </div>
         </div>
 
         <div class="form-group">
-            <label>タスク期限 (年月日時分)</label>
+            <label>期限</label>
             <input type="datetime-local" id="taskDeadline">
         </div>
 
-        <button id="submitBtn" onclick="addTask()">タスクを追加</button>
+        <button id="submitBtn" onclick="addTask()">追加</button>
     </div>
 
     <div id="taskList" class="task-list"></div>
