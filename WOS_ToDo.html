@@ -1,0 +1,533 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ゲームタスクメモ</title>
+    <style>
+        :root {
+            --bg-color: #f4f5f7;
+            --card-bg: #ffffff;
+            --text-color: #333333;
+            --border-color: #dddddd;
+            
+            /* 残り時間に応じた背景色 */
+            --color-safe: #e2f0d9;      /* 24時間以上：薄緑 */
+            --color-warn-24: #fff2cc;   /* 24時間以内：薄黄 */
+            --color-warn-3: #ffe599;    /* 3時間以内：濃い目の黄色 */
+            --color-warn-1: #f8cecc;    /* 1時間以内：はっきりとした赤・ピンク */
+            --color-expired: #d9d9d9;   /* 期限超過：濃い目の灰色 */
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            padding: 10px;
+            font-size: 14px;
+            user-select: none;
+        }
+
+        h1 {
+            text-align: center;
+            font-size: 1.2rem;
+            margin-bottom: 15px;
+        }
+
+        .form-container {
+            background: var(--card-bg);
+            padding: 15px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+            transition: background-color 0.3s;
+        }
+
+        /* 編集中の入力エリア背景を少し強調 */
+        .form-container.editing {
+            background-color: #f0f7ff;
+            border: 2px dashed #007aff;
+        }
+
+        .form-group {
+            margin-bottom: 12px;
+        }
+
+        .form-group label {
+            display: block;
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+
+        .input-row {
+            display: flex;
+            gap: 5px;
+            align-items: center;
+        }
+
+        input, button {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            font-size: 14px;
+        }
+
+        input[type="number"] {
+            text-align: right;
+        }
+
+        button {
+            background-color: #007aff;
+            color: white;
+            border: none;
+            font-weight: bold;
+            cursor: pointer;
+            padding: 10px;
+        }
+
+        button:active {
+            opacity: 0.8;
+        }
+
+        /* 更新ボタンの色 */
+        .update-mode-btn {
+            background-color: #ff9500 !important;
+        }
+
+        .calc-btn {
+            background-color: #34c759;
+            width: 50px;
+            height: 36px;
+            font-size: 1.2rem;
+            padding: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+        }
+
+        .task-list {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .task-card {
+            background: var(--card-bg);
+            border-radius: 8px;
+            padding: 12px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+            border-left: 6px solid #ccc;
+            position: relative;
+            cursor: pointer;
+            transition: transform 0.1s, opacity 0.3s;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        .task-card:active {
+            transform: scale(0.98);
+        }
+
+        @keyframes copy-flash {
+            0% { opacity: 0.5; background-color: #fff; }
+            100% { }
+        }
+        .copied-flash {
+            animation: copy-flash 0.4s ease-out;
+        }
+
+        .task-safe { background-color: var(--color-safe); border-left-color: #2ea44f; }
+        .task-warn-24 { background-color: var(--color-warn-24); border-left-color: #d29034; }
+        .task-warn-3 { background-color: var(--color-warn-3); border-left-color: #b58100; }
+        .task-warn-1 { background-color: var(--color-warn-1); border-left-color: #cf222e; }
+        .task-expired { background-color: var(--color-expired); border-left-color: #57606a; color: #555; }
+
+        .task-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 6px;
+        }
+
+        .task-title {
+            font-weight: bold;
+            font-size: 1.1rem;
+            word-break: break-all;
+            padding-right: 45px;
+        }
+
+        .task-time-info {
+            font-size: 0.85rem;
+            margin-bottom: 4px;
+        }
+
+        .task-countdown {
+            font-weight: bold;
+        }
+
+        /* 右上：✕ボタン */
+        .delete-btn {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background-color: #ff3b30;
+            color: white;
+            border: none;
+            width: 30px;
+            height: 30px;
+            font-size: 16px;
+            font-weight: bold;
+            border-radius: 50%;
+            padding: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 10;
+        }
+
+        /* 右下：✏️ボタン */
+        .edit-btn {
+            position: absolute;
+            bottom: 10px;
+            right: 10px;
+            background-color: #007aff;
+            color: white;
+            border: none;
+            width: 32px;
+            height: 32px;
+            font-size: 16px;
+            border-radius: 6px;
+            padding: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 10;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .toast {
+            position: fixed;
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%) translateY(100px);
+            background-color: rgba(0, 0, 0, 0.85);
+            color: white;
+            padding: 10px 20px;
+            border-radius: 20px;
+            font-size: 13px;
+            white-space: nowrap;
+            z-index: 9999;
+            opacity: 0;
+            transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275), opacity 0.3s;
+            pointer-events: none;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+            max-width: 90%;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .toast.show {
+            transform: translateX(-50%) translateY(0);
+            opacity: 1;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>🎮 ゲームタスクメモ</h1>
+
+    <div class="form-container" id="formContainer">
+        <div class="form-group">
+            <label>タスク名</label>
+            <input type="text" id="taskName" list="presetOptions" placeholder="タップして選択、または直接入力">
+            <datalist id="presetOptions">
+                <option value="デイリーミッション"></option>
+                <option value="ウィークリーミッション"></option>
+                <option value="スタミナ全回復"></option>
+                <option value="イベント終了"></option>
+                <option value="派遣・遠征完了"></option>
+            </datalist>
+        </div>
+
+        <div class="form-group">
+            <label>残り時間から期限を設定</label>
+            <div class="input-row">
+                <input type="number" id="inputDays" min="0" placeholder="日"> 日
+                <input type="number" id="inputHours" min="0" placeholder="時"> 時
+                <input type="number" id="inputMins" min="0" placeholder="分"> 分
+                <button type="button" class="calc-btn" onclick="setDeadlineFromRemaining()">⏰</button>
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label>タスク期限 (年月日時分)</label>
+            <input type="datetime-local" id="taskDeadline">
+        </div>
+
+        <button id="submitBtn" onclick="addTask()">タスクを追加</button>
+    </div>
+
+    <div id="taskList" class="task-list"></div>
+
+    <div id="toast" class="toast"></div>
+
+    <script>
+        let tasks = JSON.parse(localStorage.getItem('game_tasks')) || [];
+        let toastTimeout = null;
+        let editingTaskId = null; // 現在編集中のタスクIDを保持する変数
+
+        window.onload = function() {
+            renderTasks();
+            setInterval(renderTasks, 60000); 
+        };
+
+        function setDeadlineFromRemaining() {
+            const d = parseInt(document.getElementById('inputDays').value) || 0;
+            const h = parseInt(document.getElementById('inputHours').value) || 0;
+            const m = parseInt(document.getElementById('inputMins').value) || 0;
+
+            if (d === 0 && h === 0 && m === 0) {
+                alert('残り時間を入力してください。');
+                return;
+            }
+
+            const now = new Date();
+            const targetTime = new Date(now.getTime() + (d * 24 * 60 * 60 * 1000) + (h * 60 * 60 * 1000) + (m * 60 * 1000));
+            
+            const yyyy = targetTime.getFullYear();
+            const mm = String(targetTime.getMonth() + 1).padStart(2, '0');
+            const dd = String(targetTime.getDate()).padStart(2, '0');
+            const hh = String(targetTime.getHours()).padStart(2, '0');
+            const min = String(targetTime.getMinutes()).padStart(2, '0');
+            
+            document.getElementById('taskDeadline').value = `${yyyy}-${mm}-${dd}T${hh}:${min}`;
+        }
+
+        // タスク追加（または更新）
+        function addTask() {
+            const name = document.getElementById('taskName').value.trim();
+            const deadlineVal = document.getElementById('taskDeadline').value;
+
+            if (!name) {
+                alert('タスク名を入力してください。');
+                return;
+            }
+            if (!deadlineVal) {
+                alert('期限を入力（または残り時間から計算）してください。');
+                return;
+            }
+
+            if (editingTaskId !== null) {
+                // 編集モード：既存の古いIDのタスクを削除
+                tasks = tasks.filter(t => t.id !== editingTaskId);
+            }
+
+            // 新規あるいは上書き用としてタスクを保存
+            const newTask = {
+                id: editingTaskId || Date.now(), // 編集時はIDを維持、新規は現在時刻
+                name: name,
+                deadline: deadlineVal 
+            };
+
+            tasks.push(newTask);
+            saveAndRender();
+            clearForm(); // 入力欄のリセットと編集モード解除
+        }
+
+        // 編集モードを開始する関数
+        function startEdit(id, event) {
+            event.stopPropagation(); // カード自体の「コピーイベント」を発生させない
+            
+            const targetTask = tasks.find(t => t.id === id);
+            if (!targetTask) return;
+
+            editingTaskId = id;
+
+            // 入力欄に値を復元
+            document.getElementById('taskName').value = targetTask.name;
+            document.getElementById('taskDeadline').value = targetTask.deadline;
+            
+            // 残り時間計算の欄はリセット（新しく打ち直せるようにするため）
+            document.getElementById('inputDays').value = '';
+            document.getElementById('inputHours').value = '';
+            document.getElementById('inputMins').value = '';
+
+            // フォームの見た目を「編集モード」に変更
+            document.getElementById('formContainer').classList.add('editing');
+            const submitBtn = document.getElementById('submitBtn');
+            submitBtn.textContent = 'タスクを更新';
+            submitBtn.classList.add('update-mode-btn');
+
+            // 画面最上部のフォームまでスムーズにスクロール
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+
+        // フォームのリセットと編集モード終了
+        function clearForm() {
+            editingTaskId = null;
+            document.getElementById('taskName').value = '';
+            document.getElementById('taskDeadline').value = '';
+            document.getElementById('inputDays').value = '';
+            document.getElementById('inputHours').value = '';
+            document.getElementById('inputMins').value = '';
+
+            document.getElementById('formContainer').classList.remove('editing');
+            const submitBtn = document.getElementById('submitBtn');
+            submitBtn.textContent = 'タスクを追加';
+            submitBtn.classList.remove('update-mode-btn');
+        }
+
+        function deleteTask(id, event) {
+            event.stopPropagation();
+            if (confirm('このタスクを削除しますか？')) {
+                // もし編集中のタスクを消した場合は、編集モードもクリアする
+                if (editingTaskId === id) {
+                    clearForm();
+                }
+                tasks = tasks.filter(t => t.id !== id);
+                saveAndRender();
+            }
+        }
+
+        function showToast(message) {
+            const toast = document.getElementById('toast');
+            toast.textContent = message;
+            
+            if (toastTimeout) {
+                clearTimeout(toastTimeout);
+            }
+
+            toast.classList.add('show');
+
+            toastTimeout = setTimeout(() => {
+                toast.classList.remove('show');
+            }, 2000);
+        }
+
+        function copyToClipboard(taskName, deadlineStr, element) {
+            const dDate = new Date(deadlineStr);
+            const hh = String(dDate.getHours()).padStart(2, '0');
+            const mm = String(dDate.getMinutes()).padStart(2, '0');
+            
+            const textToCopy = `${taskName} ${hh}:${mm}`;
+
+            navigator.clipboard.writeText(textToCopy).then(() => {
+                element.classList.add('copied-flash');
+                setTimeout(() => {
+                    element.classList.remove('copied-flash');
+                }, 400);
+
+                showToast(`📋 コピーしました: ${textToCopy}`);
+            }).catch(err => {
+                console.error('コピーに失敗しました: ', err);
+            });
+        }
+
+        function saveAndRender() {
+            localStorage.setItem('game_tasks', JSON.stringify(tasks));
+            renderTasks();
+        }
+
+        function renderTasks() {
+            const listContainer = document.getElementById('taskList');
+            listContainer.innerHTML = '';
+
+            if (tasks.length === 0) {
+                listContainer.innerHTML = '<p style="text-align:center; color:#888;">タスクはありません</p>';
+                return;
+            }
+
+            const now = new Date();
+
+            const processedTasks = tasks.map(task => {
+                const deadlineDate = new Date(task.deadline);
+                const diffMs = deadlineDate.getTime() - now.getTime();
+                return {
+                    ...task,
+                    diffMs: diffMs,
+                    isExpired: diffMs <= 0
+                };
+            });
+
+            processedTasks.sort((a, b) => {
+                if (a.isExpired !== b.isExpired) {
+                    return a.isExpired ? 1 : -1; 
+                }
+                return a.diffMs - b.diffMs;
+            });
+
+            processedTasks.forEach(task => {
+                const card = document.createElement('div');
+                card.className = 'task-card';
+
+                card.onclick = function() {
+                    copyToClipboard(task.name, task.deadline, card);
+                };
+
+                let statusClass = 'task-safe';
+                if (task.isExpired) {
+                    statusClass = 'task-expired';
+                } else {
+                    const diffHours = task.diffMs / (1000 * 60 * 60);
+                    if (diffHours <= 1) {
+                        statusClass = 'task-warn-1';
+                    } else if (diffHours <= 3) {
+                        statusClass = 'task-warn-3';
+                    } else if (diffHours <= 24) {
+                        statusClass = 'task-warn-24';
+                    }
+                }
+                card.classList.add(statusClass);
+
+                const dDate = new Date(task.deadline);
+                const textDeadline = `${dDate.getFullYear()}/${dDate.getMonth()+1}/${dDate.getDate()} ${String(dDate.getHours()).padStart(2,'0')}:${String(dDate.getMinutes()).padStart(2,'0')}`;
+
+                let countdownText = '';
+                if (task.isExpired) {
+                    const absDiff = Math.abs(task.diffMs);
+                    const h = Math.floor(absDiff / (1000 * 60 * 60));
+                    const m = Math.floor((absDiff % (1000 * 60 * 60)) / (1000 * 60));
+                    countdownText = `期限切れ (${h}時間${m}分 超過)`;
+                } else {
+                    const totalMins = Math.floor(task.diffMs / (1000 * 60));
+                    const d = Math.floor(totalMins / (24 * 60));
+                    const h = Math.floor((totalMins % (24 * 60)) / 60);
+                    const m = totalMins % 60;
+                    
+                    countdownText = 'あと ';
+                    if (d > 0) countdownText += `${d}日`;
+                    if (h > 0 || d > 0) countdownText += `${h}時間`;
+                    countdownText += `${m}分`;
+                }
+
+                card.innerHTML = `
+                    <div class="task-header">
+                        <div class="task-title">${escapeHtml(task.name)}</div>
+                        <button class="delete-btn" onclick="deleteTask(${task.id}, event)">✕</button>
+                    </div>
+                    <div class="task-time-info">期限: ${textDeadline}</div>
+                    <div class="task-countdown">${countdownText}</div>
+                    <button class="edit-btn" onclick="startEdit(${task.id}, event)">✏️</button>
+                `;
+
+                listContainer.appendChild(card);
+            });
+        }
+
+        function escapeHtml(str) {
+            return str.replace(/&/g, '&amp;')
+                      .replace(/</g, '&lt;')
+                      .replace(/>/g, '&gt;')
+                      .replace(/"/g, '&quot;')
+                      .replace(/'/g, '&#039;');
+        }
+    </script>
+</body>
+</html>
