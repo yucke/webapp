@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ゲームタスクメモ</title>
+    <title>WOS タスク期限管理</title>
     <style>
         :root {
             --bg-color: #f4f5f7;
@@ -45,7 +45,7 @@
             padding: 15px;
             border-radius: 8px;
             box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-            margin-bottom: 20px;
+            margin-bottom: 15px;
             transition: background-color 0.3s;
         }
 
@@ -142,6 +142,18 @@
             flex-shrink: 0;
         }
 
+        .bulk-copy-container {
+            margin-bottom: 15px;
+        }
+        
+        .bulk-copy-btn {
+            background-color: #5856d6;
+            padding: 12px;
+            font-size: 14px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
         .task-list {
             display: flex;
             flex-direction: column;
@@ -220,7 +232,6 @@
             z-index: 10;
         }
 
-        /* 通常時の編集ボタン */
         .edit-btn {
             position: absolute;
             bottom: 10px;
@@ -240,12 +251,11 @@
             box-shadow: 0 2px 4px rgba(0,0,0,0.1);
         }
 
-        /* 編集中（不活性）状態の編集ボタンのスタイル */
         .edit-btn:disabled {
             background-color: rgba(0, 0, 0, 0.4);
             color: #ffffff;
-            width: auto;             /* 文字を収めるために自動幅に */
-            padding: 0 8px;          /* 左右に少し余白 */
+            width: auto;
+            padding: 0 8px;
             font-size: 11px;
             font-weight: bold;
             box-shadow: none;
@@ -282,16 +292,17 @@
 </head>
 <body>
 
-    <h1>🎮 タスク期限</h1>
+    <!-- アプリ名の変更箇所 -->
+    <h1>👑 WOS タスク期限管理</h1>
 
     <div class="form-container" id="formContainer">
         <div class="form-group">
             <label>タスク名</label>
             <input type="text" id="taskName" placeholder="タップして選択、または直接入力" autocomplete="off">
             <div id="customSuggest" class="custom-suggest-list">
-                <div class="custom-suggest-item" data-value="ステーション保護切れ">ステーション保護切れ</div>
+                <div class="custom-suggest-item" data-value="ステ保護切れ">ステ保護切れ</div>
+                <div class="custom-suggest-item" data-value="エントリー〆切">エントリー〆切</div>
                 <div class="custom-suggest-item" data-value="交換期限">交換期限</div>
-                <div class="custom-suggest-item" data-value="エントリー期限">エントリー期限</div>
                 <div class="custom-suggest-item" data-value="イベント終了">イベント終了</div>
             </div>
         </div>
@@ -299,19 +310,23 @@
         <div class="form-group">
             <label>残り時間から期限を設定</label>
             <div class="input-row">
-                <input type="number" id="inputDays" min="0" placeholder="日"> d
-                <input type="number" id="inputHours" min="0" placeholder="時"> h
-                <input type="number" id="inputMins" min="0" placeholder="分"> m
+                <input type="number" id="inputDays" min="0" placeholder="日"> 日
+                <input type="number" id="inputHours" min="0" placeholder="時"> 時
+                <input type="number" id="inputMins" min="0" placeholder="分"> 分
                 <button type="button" class="calc-btn" onclick="setDeadlineFromRemaining()">⏰</button>
             </div>
         </div>
 
         <div class="form-group">
-            <label>期限</label>
+            <label>タスク期限 (年月日時分)</label>
             <input type="datetime-local" id="taskDeadline">
         </div>
 
-        <button id="submitBtn" onclick="addTask()">追加</button>
+        <button id="submitBtn" onclick="addTask()">タスクを追加</button>
+    </div>
+
+    <div class="bulk-copy-container">
+        <button class="bulk-copy-btn" onclick="copy24hTasks()">🔥 24H以内のタスクを一括コピー</button>
     </div>
 
     <div id="taskList" class="task-list"></div>
@@ -334,23 +349,28 @@
             const suggest = document.getElementById('customSuggest');
             const items = suggest.querySelectorAll('.custom-suggest-item');
 
-            input.addEventListener('focus', function() {
-                suggest.style.display = 'block';
+            input.addEventListener('click', function(e) {
+                e.stopPropagation();
+                if (suggest.style.display === 'block') {
+                    suggest.style.display = 'none';
+                } else {
+                    suggest.style.display = 'block';
+                }
             });
 
             items.forEach(item => {
-                item.addEventListener('mousedown', function(e) {
-                    input.value = this.getAttribute('data-value');
+                const selectValue = function(e) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    input.value = item.getAttribute('data-value');
                     suggest.style.display = 'none';
-                });
-                item.addEventListener('touchstart', function(e) {
-                    input.value = this.getAttribute('data-value');
-                    suggest.style.display = 'none';
-                });
+                };
+                item.addEventListener('mousedown', selectValue);
+                item.addEventListener('touchstart', selectValue);
             });
 
             document.addEventListener('click', function(e) {
-                if (e.target !== input && !suggest.contains(e.target)) {
+                if (e.target !== input) {
                     suggest.style.display = 'none';
                 }
             });
@@ -427,8 +447,6 @@
             submitBtn.classList.add('update-mode-btn');
 
             window.scrollTo({ top: 0, behavior: 'smooth' });
-            
-            // 編集対象が変わったので、ボタンの不活性表示を反映するために再描画
             renderTasks();
         }
 
@@ -482,14 +500,48 @@
             const textToCopy = `${taskName} ${hh}:${mm}`;
 
             navigator.clipboard.writeText(textToCopy).then(() => {
-                element.classList.add('copied-flash');
-                setTimeout(() => {
-                    element.classList.remove('copied-flash');
-                }, 400);
-
+                if (element) {
+                    element.classList.add('copied-flash');
+                    setTimeout(() => {
+                        element.classList.remove('copied-flash');
+                    }, 400);
+                }
                 showToast(`📋 コピーしました: ${textToCopy}`);
             }).catch(err => {
                 console.error('コピーに失敗しました: ', err);
+            });
+        }
+
+        function copy24hTasks() {
+            const now = new Date();
+            
+            const targetTasks = tasks.filter(task => {
+                const deadlineDate = new Date(task.deadline);
+                const diffMs = deadlineDate.getTime() - now.getTime();
+                const diffHours = diffMs / (1000 * 60 * 60);
+                return diffMs > 0 && diffHours <= 24;
+            });
+
+            if (targetTasks.length === 0) {
+                showToast('⚠️ 24時間以内の期限内タスクはありません');
+                return;
+            }
+
+            targetTasks.sort((a, b) => new Date(a.deadline).getTime() - new Date(b.deadline).getTime());
+
+            const lines = targetTasks.map(task => {
+                const dDate = new Date(task.deadline);
+                const hh = String(dDate.getHours()).padStart(2, '0');
+                const mm = String(dDate.getMinutes()).padStart(2, '0');
+                return `${task.name} ${hh}:${mm}`;
+            });
+
+            const bulkText = lines.join('\n');
+
+            navigator.clipboard.writeText(bulkText).then(() => {
+                showToast(`📋 24H以内 ${targetTasks.length}件を一括コピーしました`);
+            }).catch(err => {
+                console.error('一括コピーに失敗しました: ', err);
             });
         }
 
@@ -570,7 +622,6 @@
                     countdownText += `${m}分`;
                 }
 
-                // 編集中のタスクかどうかの判定
                 const isCurrentlyEditing = (task.id === editingTaskId);
 
                 card.innerHTML = `
