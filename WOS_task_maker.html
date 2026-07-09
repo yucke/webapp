@@ -100,6 +100,31 @@
       width: 200px;
     }
 
+    .column-shift-controls {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+    }
+
+    .btn-shift {
+      background: #f59e0b;
+      color: white;
+      border: none;
+      width: 36px;
+      height: 36px;
+      border-radius: 6px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: bold;
+      padding: 0;
+    }
+
+    .btn-shift:hover {
+      background: #d97706;
+    }
+
     .table-wrapper { overflow-x: auto; margin-bottom: 20px; }
     table { width: 100%; border-collapse: collapse; min-width: 300px; }
     th, td { border: 1px solid var(--border); padding: 3px; text-align: center; }
@@ -181,6 +206,11 @@
       <button class="btn btn-add-row" onclick="addRow()">
         <i data-lucide="list-plus"></i> ミッション追加
       </button>
+      <div class="column-shift-controls">
+        <button class="btn-shift" onclick="shiftColumnsLeft()" title="列を左に移動">←</button>
+        <span style="font-size: 0.9rem; color: #666;">曜日シフト</span>
+        <button class="btn-shift" onclick="shiftColumnsRight()" title="列を右に移動">→</button>
+      </div>
     </div>
 
     <div class="table-wrapper">
@@ -316,6 +346,42 @@
       if (!name) return;
       ev.missions[name] = Array.from(row.querySelectorAll('.day-check')).map(c => c.checked);
     });
+  }
+
+  function shiftColumnsLeft() {
+    saveCurrentState();
+    const ev = events.find(e => e.id === activeEventId);
+    if (!ev) return;
+    
+    // 各ミッションの列を左にシフト（最後の列が最初に循環）
+    Object.keys(ev.missions).forEach(name => {
+      const checks = ev.missions[name];
+      if (checks.length === 7) {
+        // 最後の要素を取り出して最初に挿入
+        const lastValue = checks.pop();
+        checks.unshift(lastValue);
+      }
+    });
+    
+    renderEditor();
+  }
+
+  function shiftColumnsRight() {
+    saveCurrentState();
+    const ev = events.find(e => e.id === activeEventId);
+    if (!ev) return;
+    
+    // 各ミッションの列を右にシフト（最初の列が最後に循環）
+    Object.keys(ev.missions).forEach(name => {
+      const checks = ev.missions[name];
+      if (checks.length === 7) {
+        // 最初の要素を取り出して最後に追加
+        const firstValue = checks.shift();
+        checks.push(firstValue);
+      }
+    });
+    
+    renderEditor();
   }
 
   function addEvent() {
