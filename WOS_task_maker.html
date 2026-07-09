@@ -229,7 +229,7 @@
 
   <div class="symbol-settings">
     <label>出力記号（優先度高い順）:</label>
-    <input type="text" id="symbol-input" class="symbol-input" placeholder="例: ◎◯△" value="◎◯△□◇＊">
+    <input type="text" id="symbol-input" class="symbol-input" placeholder="例: ◎◯△" value="◎◯△□◇＊" onchange="saveSettings()">
   </div>
 
   <button class="btn btn-generate" onclick="generateOutput()">
@@ -250,6 +250,8 @@
 </datalist>
 
 <script>
+  const STORAGE_KEY = 'wos_task_maker_data';
+  const SETTINGS_KEY = 'wos_task_maker_settings';
   let events = [{ id: Date.now(), name: "イベント 1", missions: {} }];
   let activeEventId = events[0].id;
   const defaultMissions = ["総力", "火晶", "加速", "訓練", "欠片", "領主装", "領主宝", "英装備", "採集", "ラキル", "ペット", "鍵募集", "野巨獣", "ダイヤ"];
@@ -283,10 +285,69 @@
     return str + '　'.repeat(Math.ceil(padding / 2)) + ' '.repeat(padding % 2);
   };
 
+  // ローカルストレージに保存
+  function saveToStorage() {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(events));
+    } catch (e) {
+      console.error('Failed to save to localStorage:', e);
+    }
+  }
+
+  // ローカルストレージから復元
+  function loadFromStorage() {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY);
+      if (saved) {
+        events = JSON.parse(saved);
+        if (events.length === 0) {
+          events = [{ id: Date.now(), name: "イベント 1", missions: {} }];
+        }
+        activeEventId = events[0].id;
+      }
+    } catch (e) {
+      console.error('Failed to load from localStorage:', e);
+    }
+  }
+
+  // 設定を保存（記号）
+  function saveSettings() {
+    try {
+      const settings = {
+        symbols: document.getElementById('symbol-input').value
+      };
+      localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
+    } catch (e) {
+      console.error('Failed to save settings:', e);
+    }
+  }
+
+  // 設定を復元
+  function loadSettings() {
+    try {
+      const saved = localStorage.getItem(SETTINGS_KEY);
+      if (saved) {
+        const settings = JSON.parse(saved);
+        if (settings.symbols) {
+          document.getElementById('symbol-input').value = settings.symbols;
+        }
+      }
+    } catch (e) {
+      console.error('Failed to load settings:', e);
+    }
+  }
+
   function init() {
-    defaultMissions.forEach(m => {
-      events[0].missions[m] = [false, false, false, false, false, false, false];
-    });
+    loadFromStorage();
+    loadSettings();
+    
+    // 初期化：保存されたデータがない場合のみデフォルトを適用
+    if (events[0].missions && Object.keys(events[0].missions).length === 0) {
+      defaultMissions.forEach(m => {
+        events[0].missions[m] = [false, false, false, false, false, false, false];
+      });
+    }
+    
     renderTabs();
     renderEditor();
   }
@@ -346,6 +407,7 @@
       if (!name) return;
       ev.missions[name] = Array.from(row.querySelectorAll('.day-check')).map(c => c.checked);
     });
+    saveToStorage();
   }
 
   function shiftColumnsLeft() {
@@ -363,6 +425,7 @@
       }
     });
     
+    saveToStorage();
     renderEditor();
   }
 
@@ -381,6 +444,7 @@
       }
     });
     
+    saveToStorage();
     renderEditor();
   }
 
@@ -395,6 +459,7 @@
     });
     events.push({ id: newId, name: `イベント ${events.length + 1}`, missions: newMissions });
     activeEventId = newId;
+    saveToStorage();
     renderTabs();
     renderEditor();
   }
@@ -402,6 +467,7 @@
   function removeEvent(id) {
     events = events.filter(e => e.id !== id);
     if (activeEventId === id) activeEventId = events[0].id;
+    saveToStorage();
     renderTabs();
     renderEditor();
   }
@@ -416,6 +482,7 @@
   function updateEventName(val) {
     const ev = events.find(e => e.id === activeEventId);
     ev.name = val;
+    saveToStorage();
     renderTabs();
   }
 
