@@ -125,6 +125,20 @@
       background: #d97706;
     }
 
+    .template-controls {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+
+    .template-select {
+      padding: 8px;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      font-size: 0.9rem;
+    }
+
     .table-wrapper { overflow-x: auto; margin-bottom: 20px; }
     table { width: 100%; border-collapse: collapse; min-width: 300px; }
     th, td { border: 1px solid var(--border); padding: 3px; text-align: center; }
@@ -213,6 +227,13 @@
       </div>
     </div>
 
+    <div class="template-controls">
+      <label>テンプレート:</label>
+      <select id="template-select" class="template-select" onchange="applyTemplate()">
+        <option value="">-- 選択してください --</option>
+      </select>
+    </div>
+
     <div class="table-wrapper">
       <table>
         <thead>
@@ -252,8 +273,12 @@
 <script>
   const STORAGE_KEY = 'wos_task_maker_data';
   const SETTINGS_KEY = 'wos_task_maker_settings';
+  const TEMPLATES_KEY = 'wos_task_maker_templates';
+  
   let events = [{ id: Date.now(), name: "イベント 1", missions: {} }];
   let activeEventId = events[0].id;
+  let templates = [];
+  
   const defaultMissions = ["総力", "火晶", "加速", "訓練", "欠片", "領主装", "領主宝", "英装備", "採集", "ラキル", "ペット", "鍵募集", "野巨獣", "ダイヤ"];
   
   const toFullWidth = (num) => String(num).replace(/[0-9]/g, s => String.fromCharCode(s.charCodeAt(0) + 0xFEE0));
@@ -337,9 +362,63 @@
     }
   }
 
+  // テンプレートを読み込む
+  function loadTemplates() {
+    try {
+      const saved = localStorage.getItem(TEMPLATES_KEY);
+      if (saved) {
+        templates = JSON.parse(saved);
+      }
+    } catch (e) {
+      console.error('Failed to load templates:', e);
+    }
+    updateTemplateSelect();
+  }
+
+  // テンプレートセレクトを更新
+  function updateTemplateSelect() {
+    const select = document.getElementById('template-select');
+    const options = select.querySelectorAll('option:not(:first-child)');
+    options.forEach(opt => opt.remove());
+    
+    templates.forEach((template, index) => {
+      const option = document.createElement('option');
+      option.value = index;
+      option.textContent = template.name;
+      select.appendChild(option);
+    });
+  }
+
+  // テンプレートを適用
+  function applyTemplate() {
+    const select = document.getElementById('template-select');
+    const index = select.value;
+    
+    if (index === '') return;
+    
+    const template = templates[index];
+    if (!template) return;
+    
+    const ev = events.find(e => e.id === activeEventId);
+    if (!ev) return;
+    
+    // ミッション名とチェック状態を適用
+    ev.missions = {};
+    Object.keys(template.missions).forEach(missionName => {
+      const checks = template.missions[missionName];
+      // 0と1をboolean に変換
+      ev.missions[missionName] = checks.map(c => c === 1 || c === true);
+    });
+    
+    saveToStorage();
+    renderEditor();
+    select.value = ''; // リセット
+  }
+
   function init() {
     loadFromStorage();
     loadSettings();
+    loadTemplates();
     
     // 初期化：保存されたデータがない場合のみデフォルトを適用
     if (events[0].missions && Object.keys(events[0].missions).length === 0) {
