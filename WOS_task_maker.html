@@ -353,13 +353,13 @@
     const ev = events.find(e => e.id === activeEventId);
     if (!ev) return;
     
-    // 各ミッションの列を左にシフト（最後の列が最初に循環）
+    // 各ミッションの列を左にシフト（最初の列が最後に循環）
     Object.keys(ev.missions).forEach(name => {
       const checks = ev.missions[name];
       if (checks.length === 7) {
-        // 最後の要素を取り出して最初に挿入
-        const lastValue = checks.pop();
-        checks.unshift(lastValue);
+        // 最初の要素を取り出して最後に追加
+        const firstValue = checks.shift();
+        checks.push(firstValue);
       }
     });
     
@@ -371,13 +371,13 @@
     const ev = events.find(e => e.id === activeEventId);
     if (!ev) return;
     
-    // 各ミッションの列を右にシフト（最初の列が最後に循環）
+    // 各ミッションの列を右にシフト（最後の列が最初に循環）
     Object.keys(ev.missions).forEach(name => {
       const checks = ev.missions[name];
       if (checks.length === 7) {
-        // 最初の要素を取り出して最後に追加
-        const firstValue = checks.shift();
-        checks.push(firstValue);
+        // 最後の要素を取り出して最初に挿入
+        const lastValue = checks.pop();
+        checks.unshift(lastValue);
       }
     });
     
