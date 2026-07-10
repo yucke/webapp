@@ -1,0 +1,364 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>テンプレート作成ツール</title>
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <style>
+    :root {
+      --primary: #4f46e5;
+      --bg: #f8fafc;
+      --card: #ffffff;
+      --border: #e2e8f0;
+      --text: #1e293b;
+    }
+
+    body {
+      font-family: "Helvetica Neue", Arial, "Hiragino Kaku Gothic ProN", "Hiragino Sans", Meiryo, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      margin: 0;
+      padding: 20px;
+    }
+
+    .container {
+      max-width: 1000px;
+      margin: 0 auto;
+      background: var(--card);
+      padding: 24px;
+      border-radius: 12px;
+      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+    }
+
+    header {
+      margin-bottom: 20px;
+      border-bottom: 2px solid var(--border);
+      padding-bottom: 10px;
+    }
+
+    h2 { margin: 0; font-size: 1.5rem; color: var(--primary); }
+    
+    .subheader {
+      font-size: 0.9rem;
+      color: #64748b;
+      margin-top: 8px;
+    }
+
+    .settings {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 20px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+
+    .input-group {
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+    }
+
+    .input-group label {
+      font-size: 0.9rem;
+      font-weight: 500;
+      color: #64748b;
+    }
+
+    .input-group input {
+      padding: 8px;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      font-size: 0.95rem;
+    }
+
+    .table-wrapper { 
+      overflow-x: auto; 
+      margin-bottom: 20px; 
+    }
+
+    table { 
+      width: 100%; 
+      border-collapse: collapse; 
+      min-width: 300px; 
+    }
+
+    th, td { 
+      border: 1px solid var(--border); 
+      padding: 8px; 
+      text-align: center; 
+    }
+
+    th { 
+      background: #f8fafc; 
+      font-size: 0.9rem;
+      font-weight: 600;
+    }
+
+    .mission-name-cell {
+      text-align: left;
+      padding: 8px;
+    }
+
+    .mission-input {
+      width: 100%;
+      padding: 6px;
+      border: 1px solid #cbd5e1;
+      border-radius: 4px;
+      box-sizing: border-box;
+      font-size: 0.9rem;
+    }
+
+    .day-checkbox {
+      width: 18px;
+      height: 18px;
+      cursor: pointer;
+    }
+
+    .btn {
+      padding: 8px 16px;
+      border-radius: 6px;
+      border: none;
+      cursor: pointer;
+      font-weight: 500;
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      font-size: 0.95rem;
+    }
+
+    .btn-primary { 
+      background: var(--primary); 
+      color: white; 
+    }
+
+    .btn-primary:hover {
+      background: #4338ca;
+    }
+
+    .btn-secondary { 
+      background: #f1f5f9; 
+      color: var(--text);
+      border: 1px solid var(--border);
+    }
+
+    .btn-secondary:hover {
+      background: #e2e8f0;
+    }
+
+    .btn-add { 
+      background: #10b981; 
+      color: white; 
+    }
+
+    .btn-add:hover {
+      background: #059669;
+    }
+
+    .btn-remove { 
+      background: #ef4444; 
+      color: white; 
+      padding: 4px 8px;
+      font-size: 0.85rem;
+    }
+
+    .btn-remove:hover {
+      background: #dc2626;
+    }
+
+    .btn-copy {
+      background: #8b5cf6;
+      color: white;
+    }
+
+    .btn-copy:hover {
+      background: #7c3aed;
+    }
+
+    .output-section {
+      margin-top: 20px;
+      padding-top: 20px;
+      border-top: 2px solid var(--border);
+    }
+
+    .output-label {
+      font-weight: 600;
+      margin-bottom: 10px;
+      color: #64748b;
+    }
+
+    textarea {
+      width: 100%;
+      height: 300px;
+      margin-top: 10px;
+      font-family: monospace;
+      font-size: 0.85rem;
+      padding: 12px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: #f8fafc;
+      color: var(--text);
+      box-sizing: border-box;
+    }
+
+    .info-box {
+      background: #eff6ff;
+      border: 1px solid #bfdbfe;
+      border-radius: 6px;
+      padding: 12px;
+      margin-bottom: 20px;
+      font-size: 0.9rem;
+      color: #1e40af;
+    }
+
+    .button-group {
+      display: flex;
+      gap: 10px;
+      margin-top: 15px;
+      flex-wrap: wrap;
+    }
+  </style>
+</head>
+<body>
+
+<div class="container">
+  <header>
+    <h2>テンプレート作成ツール</h2>
+    <div class="subheader">ミッション配置テンプレートのJSONを生成します</div>
+  </header>
+
+  <div class="info-box">
+    💡 テンプレートを作成してJSONを生成し、コピーしたら WOS_task_maker.html のコード内の TEMPLATES_KEY に追加してください
+  </div>
+
+  <div class="settings">
+    <div class="input-group">
+      <label>テンプレート名</label>
+      <input type="text" id="template-name" placeholder="例：通常スケジュール" value="テンプレート1">
+    </div>
+  </div>
+
+  <div class="table-wrapper">
+    <table>
+      <thead>
+        <tr>
+          <th style="width: 120px;">ミッション名</th>
+          <th>月</th><th>火</th><th>水</th><th>木</th><th>金</th><th>土</th><th>日</th>
+          <th style="width: 60px;">削除</th>
+        </tr>
+      </thead>
+      <tbody id="mission-body"></tbody>
+    </table>
+  </div>
+
+  <button class="btn btn-add" onclick="addMission()">
+    <i data-lucide="plus"></i> ミッション追加
+  </button>
+
+  <div class="output-section">
+    <div class="output-label">生成されたJSON</div>
+    <textarea id="json-output" readonly placeholder="ここにJSONが表示されます"></textarea>
+    
+    <div class="button-group">
+      <button class="btn btn-copy" onclick="copyJSON()">
+        <i data-lucide="copy"></i> JSONをコピー
+      </button>
+      <button class="btn btn-secondary" onclick="resetForm()">
+        <i data-lucide="rotate-ccw"></i> リセット
+      </button>
+    </div>
+  </div>
+</div>
+
+<datalist id="mission-list">
+  <option value="総力"></option><option value="火晶"></option>
+  <option value="加速"></option><option value="訓練"></option>
+  <option value="欠片"></option><option value="領主装"></option>
+  <option value="領主宝"></option><option value="英装備"></option>
+  <option value="採集"></option><option value="ラキル"></option>
+  <option value="ペット"></option><option value="鍵募集"></option>
+  <option value="野巨獣"></option><option value="ダイヤ"></option>
+</datalist>
+
+<script>
+  const defaultMissions = ["総力", "火晶", "加速", "訓練", "欠片", "領主装", "領主宝", "英装備", "採集", "ラキル", "ペット", "鍵募集", "野巨獣", "ダイヤ"];
+
+  function init() {
+    defaultMissions.forEach(m => {
+      addMission(m, [0, 0, 0, 0, 0, 0, 0]);
+    });
+    lucide.createIcons();
+  }
+
+  function addMission(name = "", checks = [0, 0, 0, 0, 0, 0, 0]) {
+    const tbody = document.getElementById('mission-body');
+    const tr = document.createElement('tr');
+    
+    let html = `<td class="mission-name-cell"><input type="text" class="mission-input" value="${name}" list="mission-list" oninput="generateJSON()"></td>`;
+    
+    checks.forEach((checked, index) => {
+      const isChecked = checked === 1 || checked === true ? 'checked' : '';
+      html += `<td><input type="checkbox" class="day-checkbox" ${isChecked} onchange="generateJSON()"></td>`;
+    });
+    
+    html += `<td><button class="btn btn-remove" onclick="this.parentElement.parentElement.remove(); generateJSON();">×</button></td>`;
+    tr.innerHTML = html;
+    tbody.appendChild(tr);
+  }
+
+  function generateJSON() {
+    const name = document.getElementById('template-name').value || 'Unnamed';
+    const rows = document.querySelectorAll('#mission-body tr');
+    const missions = {};
+
+    rows.forEach(row => {
+      const missionInput = row.querySelector('.mission-input');
+      const missionName = missionInput.value.trim();
+      
+      if (!missionName) return;
+
+      const checkboxes = row.querySelectorAll('.day-checkbox');
+      const checks = Array.from(checkboxes).map(cb => cb.checked ? 1 : 0);
+      
+      missions[missionName] = checks;
+    });
+
+    const template = {
+      name: name,
+      missions: missions
+    };
+
+    const jsonOutput = document.getElementById('json-output');
+    jsonOutput.value = JSON.stringify(template, null, 2);
+  }
+
+  function copyJSON() {
+    const jsonOutput = document.getElementById('json-output');
+    
+    if (!jsonOutput.value) {
+      alert('JSONを生成してください');
+      return;
+    }
+
+    jsonOutput.select();
+    navigator.clipboard.writeText(jsonOutput.value).then(() => {
+      alert('JSONをコピーしました！\nWOS_task_maker.html のコード内に追加してください');
+    }).catch(() => {
+      alert('コピーに失敗しました');
+    });
+  }
+
+  function resetForm() {
+    document.getElementById('template-name').value = 'テンプレート1';
+    const tbody = document.getElementById('mission-body');
+    tbody.innerHTML = '';
+    document.getElementById('json-output').value = '';
+    defaultMissions.forEach(m => {
+      addMission(m, [0, 0, 0, 0, 0, 0, 0]);
+    });
+  }
+
+  window.onload = init;
+</script>
+</body>
+</html>
