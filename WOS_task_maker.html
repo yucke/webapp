@@ -420,7 +420,27 @@
     loadFromStorage();
     loadSettings();
     loadTemplates();
-    
+
+templates = [
+  {
+  "name": "季節イベント",
+  "missions": {
+    "総力": [1,0,0,0,0,1,0],
+    "加速": [0,0,1,0,0,0,1],
+    "訓練": [0,0,0,1,0,0,0],
+    "欠片": [1,0,1,0,0,0,0],
+    "領主装": [0,0,0,0,0,0,1],
+    "英装備": [0,0,0,0,0,1,0],
+    "採集": [0,0,0,0,0,1,0],
+    "鍵募集": [1,0,1,0,0,0,0],
+    "野巨獣": [0,1,0,0,0,0,0],
+    "ダイヤ": [0,0,0,0,1,0,0]
+  }
+}
+  // さらにテンプレートを追加できます
+];
+localStorage.setItem(TEMPLATES_KEY, JSON.stringify(templates));
+        
     // 初期化：保存されたデータがない場合のみデフォルトを適用
     if (events[0].missions && Object.keys(events[0].missions).length === 0) {
       defaultMissions.forEach(m => {
