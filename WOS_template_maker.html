@@ -199,6 +199,7 @@
       background: #f8fafc;
       color: var(--text);
       box-sizing: border-box;
+      word-break: break-all;
     }
 
     .info-box {
@@ -328,8 +329,20 @@
       missions: missions
     };
 
+    // ミッション行単位で改行なしにする
+    let jsonStr = '{\n  "name": "' + name + '",\n  "missions": {\n';
+    const missionEntries = Object.entries(missions);
+    missionEntries.forEach((entry, index) => {
+      jsonStr += '    "' + entry[0] + '": ' + JSON.stringify(entry[1]);
+      if (index < missionEntries.length - 1) {
+        jsonStr += ',';
+      }
+      jsonStr += '\n';
+    });
+    jsonStr += '  }\n}';
+
     const jsonOutput = document.getElementById('json-output');
-    jsonOutput.value = JSON.stringify(template, null, 2);
+    jsonOutput.value = jsonStr;
   }
 
   function copyJSON() {
