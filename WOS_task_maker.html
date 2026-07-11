@@ -564,13 +564,12 @@ localStorage.setItem(TEMPLATES_KEY, JSON.stringify(templates));
     const ev = events.find(e => e.id === activeEventId);
     if (!ev) return;
     
-    // 各ミッションの列を左にシフト（最初の列が最後に循環）
+    // 各ミッションの列を左にシフト（月曜日を削除し、日曜日にfalseを追加）
     Object.keys(ev.missions).forEach(name => {
       const checks = ev.missions[name];
       if (checks.length === 7) {
-        // 最初の要素を取り出して最後に追加
-        const firstValue = checks.shift();
-        checks.push(firstValue);
+        checks.shift();      // 先頭（月曜）を削除
+        checks.push(false);  // 末尾（日曜）に空白（false）を追加
       }
     });
     
@@ -583,19 +582,19 @@ localStorage.setItem(TEMPLATES_KEY, JSON.stringify(templates));
     const ev = events.find(e => e.id === activeEventId);
     if (!ev) return;
     
-    // 各ミッションの列を右にシフト（最後の列が最初に循環）
+    // 各ミッションの列を右にシフト（日曜日を削除し、月曜日にfalseを追加）
     Object.keys(ev.missions).forEach(name => {
       const checks = ev.missions[name];
       if (checks.length === 7) {
-        // 最後の要素を取り出して最初に挿入
-        const lastValue = checks.pop();
-        checks.unshift(lastValue);
+        checks.pop();          // 末尾（日曜）を削除
+        checks.unshift(false); // 先頭（月曜）に空白（false）を追加
       }
     });
     
     saveToStorage();
     renderEditor();
   }
+
 
   function addEvent() {
     if (events.length >= 9) return;
