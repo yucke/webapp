@@ -404,6 +404,7 @@
     if (!ev) return;
     
     // ミッション名とチェック状態を適用
+    ev.name = template.name;
     ev.missions = {};
     Object.keys(template.missions).forEach(missionName => {
       const checks = template.missions[missionName];
