@@ -183,6 +183,23 @@
         <p>Whiteout Survival — クレイジージョイ & 熊罠</p>
     </header>
 
+    <!-- 基本設定入力 -->
+    <div class="card">
+        <div class="card-title">基本設定</div>
+        <div class="grid-2">
+            <div class="form-group last">
+                <label for="marchCount">通常出征行軍数 (ジョイ用)</label>
+                <input type="number" id="marchCount" value="6" min="1" oninput="calculate()">
+            </div>
+            <div class="form-group last">
+                <label style="opacity: 0;">&nbsp;</label>
+                <div style="font-size: 0.8rem; color: var(--muted-text); padding-top: 12px;">
+                    ※熊罠用は自動的に「通常行軍数 + 自身の集結1」で計算されます。
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- 手持ち兵士数入力（盾→槍→弓） -->
     <div class="card">
         <div class="card-title">手持ち兵士数</div>
@@ -221,7 +238,7 @@
     <div class="card">
         <div class="card-title">
             クレイジージョイ
-            <span class="mode-badge">6行軍 / 優先: 盾→槍→弓</span>
+            <span class="mode-badge" id="joyBadge">6行軍 / 優先: 盾→槍→弓</span>
         </div>
         <div class="result-row shield">
             <div class="result-label">盾兵割合</div>
@@ -235,14 +252,14 @@
             <div class="result-label">弓兵割合</div>
             <div class="result-value" id="joyArcherPct">0%</div>
         </div>
-        <div class="hint-text">※容量を超過する場合、優先度の高い兵種から枠を埋めて停止します。</div>
+        <div class="hint-text" id="joyHint">※ゲーム内で上記割合を6行軍に一括設定してください。</div>
     </div>
 
     <!-- 熊罠結果（盾→槍→弓） -->
     <div class="card">
         <div class="card-title">
             熊罠
-            <span class="mode-badge">7行軍 / 優先: 弓→槍→盾</span>
+            <span class="mode-badge" id="bearBadge">7行軍 / 優先: 弓→槍→盾</span>
         </div>
         <div class="result-row shield">
             <div class="result-label">盾兵割合</div>
@@ -256,13 +273,16 @@
             <div class="result-label">弓兵割合</div>
             <div class="result-value" id="bearArcherPct">0%</div>
         </div>
-        <div class="hint-text">※容量を超過する場合、優先度の高い兵種から枠を埋めて停止します。</div>
+        <div class="hint-text" id="bearHint">※自分の集結1枠＋参加6枠のすべてにこの割合を設定してください。</div>
     </div>
 </div>
 
 <script>
     function calculate() {
         // 入力値の取得
+        const marchCount = Math.max(1, parseInt(document.getElementById('marchCount').value) || 6);
+        const bearMarchCount = marchCount + 1; // 熊罠用は「通常行軍数 + 自身の集結1」
+
         const shieldCount = Math.max(0, parseInt(document.getElementById('shieldCount').value) || 0);
         const spearCount = Math.max(0, parseInt(document.getElementById('spearCount').value) || 0);
         const archerCount = Math.max(0, parseInt(document.getElementById('archerCount').value) || 0);
@@ -270,16 +290,23 @@
         const normalCapacity = Math.max(1, parseInt(document.getElementById('normalCapacity').value) || 1);
         const bearCapacity = Math.max(1, parseInt(document.getElementById('bearCapacity').value) || 1);
 
-        // --- クレイジージョイの計算 (6行軍 / 優先度: 盾→槍→弓) ---
+        // バッジとヒントテキストを動的に更新
+        document.getElementById('joyBadge').textContent = `${marchCount}行軍 / 優先: 盾→槍→弓`;
+        document.getElementById('joyHint').textContent = `※ゲーム内で上記割合を${marchCount}行軍に一括設定してください。`;
+        
+        document.getElementById('bearBadge').textContent = `${bearMarchCount}行軍 / 優先: 弓→槍→盾`;
+        document.getElementById('bearHint').textContent = `※自分の集結1枠＋参加${marchCount}枠のすべてにこの割合を設定してください。`;
+
+        // --- クレイジージョイの計算 (marchCount行軍 / 優先度: 盾→槍→弓) ---
         let joyRemCap = normalCapacity;
         
         // 1. 盾兵の割り当て
-        const joyShieldNeeded = Math.ceil(shieldCount / 6);
+        const joyShieldNeeded = Math.ceil(shieldCount / marchCount);
         const joyShieldPerMarch = Math.min(joyShieldNeeded, joyRemCap);
         joyRemCap -= joyShieldPerMarch;
         
         // 2. 槍兵の割り当て
-        const joySpearNeeded = Math.ceil(spearCount / 6);
+        const joySpearNeeded = Math.ceil(spearCount / marchCount);
         const joySpearPerMarch = Math.min(joySpearNeeded, joyRemCap);
         joyRemCap -= joySpearPerMarch;
         
@@ -297,16 +324,16 @@
         document.getElementById('joyArcherPct').textContent = joyArcherPct + '%';
 
 
-        // --- 熊罠の計算 (7行軍 / 優先度: 弓→槍→盾) ---
+        // --- 熊罠の計算 (bearMarchCount行軍 / 優先度: 弓→槍→盾) ---
         let bearRemCap = bearCapacity;
         
         // 1. 弓兵の割り当て
-        const bearArcherNeeded = Math.ceil(archerCount / 7);
+        const bearArcherNeeded = Math.ceil(archerCount / bearMarchCount);
         const bearArcherPerMarch = Math.min(bearArcherNeeded, bearRemCap);
         bearRemCap -= bearArcherPerMarch;
         
         // 2. 槍兵の割り当て
-        const bearSpearNeeded = Math.ceil(spearCount / 7);
+        const bearSpearNeeded = Math.ceil(spearCount / bearMarchCount);
         const bearSpearPerMarch = Math.min(bearSpearNeeded, bearRemCap);
         bearRemCap -= bearSpearPerMarch;
         
