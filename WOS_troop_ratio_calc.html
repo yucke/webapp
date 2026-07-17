@@ -198,7 +198,6 @@
             text-align: right;
         }
 
-        /* コピートースト通知 */
         .toast {
             position: fixed;
             bottom: 24px;
@@ -309,7 +308,7 @@
                 <div class="result-num" id="joyArcherNum" data-raw="0" title="タップしてコピー">0</div>
             </div>
         </div>
-        <div class="hint-text" id="joyHint">※数値をタップするとカンマ無しでクリップボードにコピーします。</div>
+        <div class="hint-text" id="joyHint">※人数タップでカンマ無しの数値をコピー。</div>
     </div>
 
     <!-- 熊罠結果（盾→槍→弓） -->
@@ -339,14 +338,26 @@
                 <div class="result-num" id="bearArcherNum" data-raw="0" title="タップしてコピー">0</div>
             </div>
         </div>
-        <div class="hint-text" id="bearHint">※数値をタップするとカンマ無しでクリップボードにコピーします。</div>
+        <div class="hint-text" id="bearHint">※入力した数値は自動的にブラウザに保存されます。</div>
     </div>
 </div>
 
-<!-- トースト通知 -->
 <div id="toast" class="toast">コピーしました</div>
 
 <script>
+    // ローカルストレージ用のキー
+    const STORAGE_KEY = 'wos_march_calculator_data';
+
+    // デフォルト値
+    const defaults = {
+        marchCount: "6",
+        shieldCount: "300,000",
+        spearCount: "300,000",
+        archerCount: "400,000",
+        normalCapacity: "130,000",
+        bearCapacity: "160,000"
+    };
+
     // カンマを除去して数値化する関数
     function getNumericValue(id, minVal = 0) {
         const input = document.getElementById(id);
@@ -403,6 +414,36 @@
         document.body.removeChild(textArea);
     }
 
+    // データをLocalStorageへ保存
+    function saveToStorage() {
+        const data = {
+            marchCount: document.getElementById('marchCount').value,
+            shieldCount: document.getElementById('shieldCount').value,
+            spearCount: document.getElementById('spearCount').value,
+            archerCount: document.getElementById('archerCount').value,
+            normalCapacity: document.getElementById('normalCapacity').value,
+            bearCapacity: document.getElementById('bearCapacity').value
+        };
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+    }
+
+    // データをLocalStorageからロード
+    function loadFromStorage() {
+        const saved = localStorage.getItem(STORAGE_KEY);
+        if (saved) {
+            try {
+                const data = JSON.parse(saved);
+                for (const key in defaults) {
+                    if (data[key] !== undefined) {
+                        document.getElementById(key).value = data[key];
+                    }
+                }
+            } catch (e) {
+                console.error("Storage load error", e);
+            }
+        }
+    }
+
     function calculate() {
         // 数値の取得
         const marchCount = getNumericValue('marchCount', 1);
@@ -439,12 +480,10 @@
         const joySpearPct = Math.min(100 - joyShieldPct, Math.ceil((joySpearPerMarch / normalCapacity) * 100));
         const joyArcherPct = 100 - joyShieldPct - joySpearPct;
 
-        // 画面反映 (ジョイ割合)
         document.getElementById('joyShieldPct').textContent = joyShieldPct + '%';
         document.getElementById('joySpearPct').textContent = joySpearPct + '%';
         document.getElementById('joyArcherPct').textContent = joyArcherPct + '%';
 
-        // 画面反映 (ジョイ人数 & コピーデータ)
         const jsNum = document.getElementById('joyShieldNum');
         jsNum.textContent = formatWithCommas(joyShieldPerMarch);
         jsNum.setAttribute('data-raw', joyShieldPerMarch);
@@ -475,12 +514,10 @@
         const bearSpearPct = Math.min(100 - bearArcherPct, Math.ceil((bearSpearPerMarch / bearCapacity) * 100));
         const bearShieldPct = 100 - bearArcherPct - bearSpearPct;
 
-        // 画面反映 (熊罠割合)
         document.getElementById('bearShieldPct').textContent = bearShieldPct + '%';
         document.getElementById('bearSpearPct').textContent = bearSpearPct + '%';
         document.getElementById('bearArcherPct').textContent = bearArcherPct + '%';
 
-        // 画面反映 (熊罠人数 & コピーデータ)
         const bsNum = document.getElementById('bearShieldNum');
         bsNum.textContent = formatWithCommas(bearShieldPerMarch);
         bsNum.setAttribute('data-raw', bearShieldPerMarch);
@@ -505,6 +542,7 @@
 
         input.addEventListener('input', function() {
             calculate();
+            saveToStorage(); // 入力するたびに保存
         });
 
         input.addEventListener('blur', function() {
@@ -512,10 +550,10 @@
             const minVal = this.id === 'shieldCount' || this.id === 'spearCount' || this.id === 'archerCount' ? 0 : 1;
             const num = getNumericValue(this.id, minVal);
             this.value = formatWithCommas(num);
+            saveToStorage(); // フォーカスが外れてカンマが付いた状態も保存
         });
     });
 
-    // コピーイベントの登録
     setupCopyElement('joyShieldNum');
     setupCopyElement('joySpearNum');
     setupCopyElement('joyArcherNum');
@@ -523,8 +561,11 @@
     setupCopyElement('bearSpearNum');
     setupCopyElement('bearArcherNum');
 
-    // 初期起動時に計算を実行
-    window.onload = calculate;
+    // 初期起動時の処理
+    window.onload = function() {
+        loadFromStorage(); // まずデータを読み込む
+        calculate();       // 計算する
+    };
 </script>
 
 </body>
