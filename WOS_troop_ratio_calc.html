@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Whiteout Survival 兵士割合計算機</title>
+    <title>Whiteout Survival 行軍割合計算機</title>
     <style>
         :root {
             --bg-color: #0f172a;
@@ -108,7 +108,7 @@
             margin-bottom: 4px;
         }
 
-        input[type="number"] {
+        input[type="text"] {
             width: 100%;
             background-color: var(--bg-color);
             border: 1px solid var(--border-color);
@@ -121,18 +121,9 @@
             transition: border-color 0.2s;
         }
 
-        input[type="number"]:focus {
+        input[type="text"]:focus {
             outline: none;
             border-color: var(--accent-color);
-        }
-
-        input::-webkit-outer-spin-button,
-        input::-webkit-inner-spin-button {
-            -webkit-appearance: none;
-            margin: 0;
-        }
-        input[type=number] {
-            -moz-appearance: textfield;
         }
 
         .result-row {
@@ -179,7 +170,7 @@
 
 <div class="container">
     <header>
-        <h1>兵士割合計算機</h1>
+        <h1>行軍割合計算機</h1>
         <p>Whiteout Survival — クレイジージョイ & 熊罠</p>
     </header>
 
@@ -189,7 +180,7 @@
         <div class="grid-2">
             <div class="form-group last">
                 <label for="marchCount">通常出征行軍数 (ジョイ用)</label>
-                <input type="number" id="marchCount" value="6" min="1" oninput="calculate()">
+                <input type="text" id="marchCount" value="6" data-type="int" style="text-align: right;">
             </div>
             <div class="form-group last">
                 <label style="opacity: 0;">&nbsp;</label>
@@ -206,15 +197,15 @@
         <div class="grid-3">
             <div class="form-group">
                 <label for="shieldCount" style="color: var(--shield-color);">盾兵数</label>
-                <input type="number" id="shieldCount" value="300000" min="0" oninput="calculate()">
+                <input type="text" id="shieldCount" value="300,000" data-type="int">
             </div>
             <div class="form-group">
                 <label for="spearCount" style="color: var(--spear-color);">槍兵数</label>
-                <input type="number" id="spearCount" value="300000" min="0" oninput="calculate()">
+                <input type="text" id="spearCount" value="300,000" data-type="int">
             </div>
             <div class="form-group">
                 <label for="archerCount" style="color: var(--archer-color);">弓兵数</label>
-                <input type="number" id="archerCount" value="400000" min="0" oninput="calculate()">
+                <input type="text" id="archerCount" value="400,000" data-type="int">
             </div>
         </div>
     </div>
@@ -225,11 +216,11 @@
         <div class="grid-2">
             <div class="form-group last">
                 <label for="normalCapacity">通常出征容量 (ジョイ用)</label>
-                <input type="number" id="normalCapacity" value="130000" min="1" oninput="calculate()">
+                <input type="text" id="normalCapacity" value="130,000" data-type="int">
             </div>
             <div class="form-group last">
                 <label for="bearCapacity">熊出征容量 (専門家込)</label>
-                <input type="number" id="bearCapacity" value="160000" min="1" oninput="calculate()">
+                <input type="text" id="bearCapacity" value="160,000" data-type="int">
             </div>
         </div>
     </div>
@@ -278,78 +269,106 @@
 </div>
 
 <script>
+    // カンマを除去して数値化する関数
+    function getNumericValue(id, minVal = 0) {
+        const input = document.getElementById(id);
+        const rawValue = input.value.replace(/,/g, '');
+        const parsed = parseInt(rawValue, 10);
+        return Math.max(minVal, isNaN(parsed) ? minVal : parsed);
+    }
+
+    // 数値をカンマ区切りの文字列にする関数
+    function formatWithCommas(num) {
+        return num.toLocaleString();
+    }
+
     function calculate() {
-        // 入力値の取得
-        const marchCount = Math.max(1, parseInt(document.getElementById('marchCount').value) || 6);
-        const bearMarchCount = marchCount + 1; // 熊罠用は「通常行軍数 + 自身の集結1」
+        // 数値の取得（入力中の生の値をパース）
+        const marchCount = getNumericValue('marchCount', 1);
+        const bearMarchCount = marchCount + 1;
 
-        const shieldCount = Math.max(0, parseInt(document.getElementById('shieldCount').value) || 0);
-        const spearCount = Math.max(0, parseInt(document.getElementById('spearCount').value) || 0);
-        const archerCount = Math.max(0, parseInt(document.getElementById('archerCount').value) || 0);
+        const shieldCount = getNumericValue('shieldCount', 0);
+        const spearCount = getNumericValue('spearCount', 0);
+        const archerCount = getNumericValue('archerCount', 0);
         
-        const normalCapacity = Math.max(1, parseInt(document.getElementById('normalCapacity').value) || 1);
-        const bearCapacity = Math.max(1, parseInt(document.getElementById('bearCapacity').value) || 1);
+        const normalCapacity = getNumericValue('normalCapacity', 1);
+        const bearCapacity = getNumericValue('bearCapacity', 1);
 
-        // バッジとヒントテキストを動的に更新
+        // バッジとヒントテキストの動的更新
         document.getElementById('joyBadge').textContent = `${marchCount}行軍 / 優先: 盾→槍→弓`;
         document.getElementById('joyHint').textContent = `※ゲーム内で上記割合を${marchCount}行軍に一括設定してください。`;
         
         document.getElementById('bearBadge').textContent = `${bearMarchCount}行軍 / 優先: 弓→槍→盾`;
         document.getElementById('bearHint').textContent = `※自分の集結1枠＋参加${marchCount}枠のすべてにこの割合を設定してください。`;
 
-        // --- クレイジージョイの計算 (marchCount行軍 / 優先度: 盾→槍→弓) ---
+        // --- クレイジージョイの計算 (優先度: 盾→槍→弓) ---
         let joyRemCap = normalCapacity;
         
-        // 1. 盾兵の割り当て
         const joyShieldNeeded = Math.ceil(shieldCount / marchCount);
         const joyShieldPerMarch = Math.min(joyShieldNeeded, joyRemCap);
         joyRemCap -= joyShieldPerMarch;
         
-        // 2. 槍兵の割り当て
         const joySpearNeeded = Math.ceil(spearCount / marchCount);
         const joySpearPerMarch = Math.min(joySpearNeeded, joyRemCap);
         joyRemCap -= joySpearPerMarch;
         
-        // 3. 弓兵の割り当て (残った容量すべて)
         const joyArcherPerMarch = joyRemCap;
 
-        // 割合への変換 (優先度順に割合を確定させ、合計100%を超えないように制御)
         const joyShieldPct = Math.min(100, Math.ceil((joyShieldPerMarch / normalCapacity) * 100));
         const joySpearPct = Math.min(100 - joyShieldPct, Math.ceil((joySpearPerMarch / normalCapacity) * 100));
         const joyArcherPct = 100 - joyShieldPct - joySpearPct;
 
-        // 画面反映 (ジョイ)
         document.getElementById('joyShieldPct').textContent = joyShieldPct + '%';
         document.getElementById('joySpearPct').textContent = joySpearPct + '%';
         document.getElementById('joyArcherPct').textContent = joyArcherPct + '%';
 
 
-        // --- 熊罠の計算 (bearMarchCount行軍 / 優先度: 弓→槍→盾) ---
+        // --- 熊罠の計算 (優先度: 弓→槍→盾) ---
         let bearRemCap = bearCapacity;
         
-        // 1. 弓兵の割り当て
         const bearArcherNeeded = Math.ceil(archerCount / bearMarchCount);
         const bearArcherPerMarch = Math.min(bearArcherNeeded, bearRemCap);
         bearRemCap -= bearArcherPerMarch;
         
-        // 2. 槍兵の割り当て
         const bearSpearNeeded = Math.ceil(spearCount / bearMarchCount);
         const bearSpearPerMarch = Math.min(bearSpearNeeded, bearRemCap);
         bearRemCap -= bearSpearPerMarch;
         
-        // 3. 盾兵の割り当て (残った容量すべて)
         const bearShieldPerMarch = bearRemCap;
 
-        // 割合への変換 (優先度順: 弓→槍→盾 で割合を確定させ、合計100%を超えないように制御)
         const bearArcherPct = Math.min(100, Math.ceil((bearArcherPerMarch / bearCapacity) * 100));
         const bearSpearPct = Math.min(100 - bearArcherPct, Math.ceil((bearSpearPerMarch / bearCapacity) * 100));
         const bearShieldPct = 100 - bearArcherPct - bearSpearPct;
 
-        // 画面反映 (熊罠) - 表示順は「盾→槍→弓」
         document.getElementById('bearShieldPct').textContent = bearShieldPct + '%';
+        document.getElementById('bearSpearPct').textContent = bearShieldPct + '%'; // バグ防止のため修正確認
         document.getElementById('bearSpearPct').textContent = bearSpearPct + '%';
         document.getElementById('bearArcherPct').textContent = bearArcherPct + '%';
     }
+
+    // イベントリスナーの一括設定
+    document.querySelectorAll('input[data-type="int"]').forEach(input => {
+        // フォーカスされたとき: カンマを消し、スマホ等で数値キーボードを出しやすくする（かつテキスト選択を全選択にする）
+        input.addEventListener('focus', function() {
+            const rawValue = this.value.replace(/,/g, '');
+            this.value = rawValue;
+            this.type = 'number'; // 一時的にnumberタイプにして数値キーボードを誘発
+            setTimeout(() => this.select(), 10);
+        });
+
+        // 入力中: リアルタイム計算
+        input.addEventListener('input', function() {
+            calculate();
+        });
+
+        // フォーカスが外れたとき: カンマ区切りのテキストに戻す
+        input.addEventListener('blur', function() {
+            this.type = 'text'; // textタイプに戻す
+            const minVal = this.id === 'shieldCount' || this.id === 'spearCount' || this.id === 'archerCount' ? 0 : 1;
+            const num = getNumericValue(this.id, minVal);
+            this.value = formatWithCommas(num);
+        });
+    });
 
     // 初期起動時に計算を実行
     window.onload = calculate;
