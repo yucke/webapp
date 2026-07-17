@@ -15,6 +15,7 @@
             --shield-color: #ef4444;
             --spear-color: #10b981;
             --archer-color: #f59e0b;
+            --toast-bg: #0284c7;
         }
 
         * {
@@ -131,7 +132,7 @@
             align-items: center;
             justify-content: space-between;
             background-color: var(--bg-color);
-            padding: 12px 16px;
+            padding: 10px 14px;
             border-radius: 8px;
             margin-bottom: 8px;
             border-left: 4px solid var(--border-color);
@@ -148,21 +149,77 @@
             gap: 8px;
         }
 
-        .result-value {
+        .result-values-box {
+            display: flex;
+            align-items: baseline;
+            gap: 14px;
+            text-align: right;
+        }
+
+        .result-pct {
             font-size: 1.4rem;
             font-weight: 900;
             font-variant-numeric: tabular-nums;
+            min-width: 55px;
         }
 
-        .shield .result-value { color: var(--shield-color); }
-        .spear .result-value { color: var(--spear-color); }
-        .archer .result-value { color: var(--archer-color); }
+        .result-num {
+            font-size: 0.95rem;
+            font-weight: bold;
+            font-variant-numeric: tabular-nums;
+            background-color: rgba(255,255,255,0.05);
+            padding: 4px 8px;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: background-color 0.15s, transform 0.1s;
+            position: relative;
+        }
+
+        .result-num:hover {
+            background-color: rgba(255,255,255,0.12);
+        }
+
+        .result-num:active {
+            transform: scale(0.96);
+        }
+
+        .shield .result-pct { color: var(--shield-color); }
+        .spear .result-pct { color: var(--spear-color); }
+        .archer .result-pct { color: var(--archer-color); }
+        
+        .shield .result-num { border: 1px dashed rgba(239, 68, 68, 0.3); color: #fca5a5; }
+        .spear .result-num { border: 1px dashed rgba(16, 185, 129, 0.3); color: #6ee7b7; }
+        .archer .result-num { border: 1px dashed rgba(245, 158, 11, 0.3); color: #fcd34d; }
 
         .hint-text {
             font-size: 0.75rem;
             color: var(--muted-text);
             margin-top: 12px;
             text-align: right;
+        }
+
+        /* コピートースト通知 */
+        .toast {
+            position: fixed;
+            bottom: 24px;
+            left: 50%;
+            transform: translateX(-50%) translateY(100px);
+            background-color: var(--toast-bg);
+            color: white;
+            padding: 8px 18px;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            font-weight: bold;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+            transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275), opacity 0.3s;
+            opacity: 0;
+            pointer-events: none;
+            z-index: 9999;
+        }
+
+        .toast.show {
+            transform: translateX(-50%) translateY(0);
+            opacity: 1;
         }
     </style>
 </head>
@@ -232,18 +289,27 @@
             <span class="mode-badge" id="joyBadge">6行軍 / 優先: 盾→槍→弓</span>
         </div>
         <div class="result-row shield">
-            <div class="result-label">盾兵割合</div>
-            <div class="result-value" id="joyShieldPct">0%</div>
+            <div class="result-label">盾兵</div>
+            <div class="result-values-box">
+                <div class="result-pct" id="joyShieldPct">0%</div>
+                <div class="result-num" id="joyShieldNum" data-raw="0" title="タップしてコピー">0</div>
+            </div>
         </div>
         <div class="result-row spear">
-            <div class="result-label">槍兵割合</div>
-            <div class="result-value" id="joySpearPct">0%</div>
+            <div class="result-label">槍兵</div>
+            <div class="result-values-box">
+                <div class="result-pct" id="joySpearPct">0%</div>
+                <div class="result-num" id="joySpearNum" data-raw="0" title="タップしてコピー">0</div>
+            </div>
         </div>
         <div class="result-row archer">
-            <div class="result-label">弓兵割合</div>
-            <div class="result-value" id="joyArcherPct">0%</div>
+            <div class="result-label">弓兵</div>
+            <div class="result-values-box">
+                <div class="result-pct" id="joyArcherPct">0%</div>
+                <div class="result-num" id="joyArcherNum" data-raw="0" title="タップしてコピー">0</div>
+            </div>
         </div>
-        <div class="hint-text" id="joyHint">※ゲーム内で上記割合を6行軍に一括設定してください。</div>
+        <div class="hint-text" id="joyHint">※数値をタップするとカンマ無しでクリップボードにコピーします。</div>
     </div>
 
     <!-- 熊罠結果（盾→槍→弓） -->
@@ -253,20 +319,32 @@
             <span class="mode-badge" id="bearBadge">7行軍 / 優先: 弓→槍→盾</span>
         </div>
         <div class="result-row shield">
-            <div class="result-label">盾兵割合</div>
-            <div class="result-value" id="bearShieldPct">0%</div>
+            <div class="result-label">盾兵</div>
+            <div class="result-values-box">
+                <div class="result-pct" id="bearShieldPct">0%</div>
+                <div class="result-num" id="bearShieldNum" data-raw="0" title="タップしてコピー">0</div>
+            </div>
         </div>
         <div class="result-row spear">
-            <div class="result-label">槍兵割合</div>
-            <div class="result-value" id="bearSpearPct">0%</div>
+            <div class="result-label">槍兵</div>
+            <div class="result-values-box">
+                <div class="result-pct" id="bearSpearPct">0%</div>
+                <div class="result-num" id="bearSpearNum" data-raw="0" title="タップしてコピー">0</div>
+            </div>
         </div>
         <div class="result-row archer">
-            <div class="result-label">弓兵割合</div>
-            <div class="result-value" id="bearArcherPct">0%</div>
+            <div class="result-label">弓兵</div>
+            <div class="result-values-box">
+                <div class="result-pct" id="bearArcherPct">0%</div>
+                <div class="result-num" id="bearArcherNum" data-raw="0" title="タップしてコピー">0</div>
+            </div>
         </div>
-        <div class="hint-text" id="bearHint">※自分の集結1枠＋参加6枠のすべてにこの割合を設定してください。</div>
+        <div class="hint-text" id="bearHint">※数値をタップするとカンマ無しでクリップボードにコピーします。</div>
     </div>
 </div>
+
+<!-- トースト通知 -->
+<div id="toast" class="toast">コピーしました</div>
 
 <script>
     // カンマを除去して数値化する関数
@@ -282,8 +360,51 @@
         return num.toLocaleString();
     }
 
+    // コピートースト表示関数
+    function showToast(text) {
+        const toast = document.getElementById('toast');
+        toast.textContent = text;
+        toast.classList.add('show');
+        setTimeout(() => {
+            toast.classList.remove('show');
+        }, 1800);
+    }
+
+    // クリップボードコピー関数
+    function setupCopyElement(elementId) {
+        const el = document.getElementById(elementId);
+        el.addEventListener('click', function() {
+            const val = this.getAttribute('data-raw');
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                navigator.clipboard.writeText(val).then(() => {
+                    showToast(`${formatWithCommas(parseInt(val))} をコピーしました`);
+                }).catch(() => {
+                    fallbackCopy(val);
+                });
+            } else {
+                fallbackCopy(val);
+            }
+        });
+    }
+
+    function fallbackCopy(text) {
+        const textArea = document.createElement("textarea");
+        textArea.value = text;
+        textArea.style.position = "fixed"; 
+        document.body.appendChild(textArea);
+        textArea.focus();
+        textArea.select();
+        try {
+            document.execCommand('copy');
+            showToast(`${formatWithCommas(parseInt(text))} をコピーしました`);
+        } catch (err) {
+            showToast("コピーに失敗しました");
+        }
+        document.body.removeChild(textArea);
+    }
+
     function calculate() {
-        // 数値の取得（入力中の生の値をパース）
+        // 数値の取得
         const marchCount = getNumericValue('marchCount', 1);
         const bearMarchCount = marchCount + 1;
 
@@ -296,10 +417,10 @@
 
         // バッジとヒントテキストの動的更新
         document.getElementById('joyBadge').textContent = `${marchCount}行軍 / 優先: 盾→槍→弓`;
-        document.getElementById('joyHint').textContent = `※ゲーム内で上記割合を${marchCount}行軍に一括設定してください。`;
+        document.getElementById('joyHint').textContent = `※人数タップでカンマ無しの数値をコピー（一括設定は${marchCount}行軍）。`;
         
         document.getElementById('bearBadge').textContent = `${bearMarchCount}行軍 / 優先: 弓→槍→盾`;
-        document.getElementById('bearHint').textContent = `※自分の集結1枠＋参加${marchCount}枠のすべてにこの割合を設定してください。`;
+        document.getElementById('bearHint').textContent = `※人数タップでカンマ無しの数値をコピー（集結1枠＋参加${marchCount}枠）。`;
 
         // --- クレイジージョイの計算 (優先度: 盾→槍→弓) ---
         let joyRemCap = normalCapacity;
@@ -318,9 +439,23 @@
         const joySpearPct = Math.min(100 - joyShieldPct, Math.ceil((joySpearPerMarch / normalCapacity) * 100));
         const joyArcherPct = 100 - joyShieldPct - joySpearPct;
 
+        // 画面反映 (ジョイ割合)
         document.getElementById('joyShieldPct').textContent = joyShieldPct + '%';
         document.getElementById('joySpearPct').textContent = joySpearPct + '%';
         document.getElementById('joyArcherPct').textContent = joyArcherPct + '%';
+
+        // 画面反映 (ジョイ人数 & コピーデータ)
+        const jsNum = document.getElementById('joyShieldNum');
+        jsNum.textContent = formatWithCommas(joyShieldPerMarch);
+        jsNum.setAttribute('data-raw', joyShieldPerMarch);
+
+        const jspNum = document.getElementById('joySpearNum');
+        jspNum.textContent = formatWithCommas(joySpearPerMarch);
+        jspNum.setAttribute('data-raw', joySpearPerMarch);
+
+        const jaNum = document.getElementById('joyArcherNum');
+        jaNum.textContent = formatWithCommas(joyArcherPerMarch);
+        jaNum.setAttribute('data-raw', joyArcherPerMarch);
 
 
         // --- 熊罠の計算 (優先度: 弓→槍→盾) ---
@@ -340,35 +475,53 @@
         const bearSpearPct = Math.min(100 - bearArcherPct, Math.ceil((bearSpearPerMarch / bearCapacity) * 100));
         const bearShieldPct = 100 - bearArcherPct - bearSpearPct;
 
+        // 画面反映 (熊罠割合)
         document.getElementById('bearShieldPct').textContent = bearShieldPct + '%';
-        document.getElementById('bearSpearPct').textContent = bearShieldPct + '%'; // バグ防止のため修正確認
         document.getElementById('bearSpearPct').textContent = bearSpearPct + '%';
         document.getElementById('bearArcherPct').textContent = bearArcherPct + '%';
+
+        // 画面反映 (熊罠人数 & コピーデータ)
+        const bsNum = document.getElementById('bearShieldNum');
+        bsNum.textContent = formatWithCommas(bearShieldPerMarch);
+        bsNum.setAttribute('data-raw', bearShieldPerMarch);
+
+        const bspNum = document.getElementById('bearSpearNum');
+        bspNum.textContent = formatWithCommas(bearSpearPerMarch);
+        bspNum.setAttribute('data-raw', bearSpearPerMarch);
+
+        const baNum = document.getElementById('bearArcherNum');
+        baNum.textContent = formatWithCommas(bearArcherPerMarch);
+        baNum.setAttribute('data-raw', bearArcherPerMarch);
     }
 
     // イベントリスナーの一括設定
     document.querySelectorAll('input[data-type="int"]').forEach(input => {
-        // フォーカスされたとき: カンマを消し、スマホ等で数値キーボードを出しやすくする（かつテキスト選択を全選択にする）
         input.addEventListener('focus', function() {
             const rawValue = this.value.replace(/,/g, '');
             this.value = rawValue;
-            this.type = 'number'; // 一時的にnumberタイプにして数値キーボードを誘発
+            this.type = 'number';
             setTimeout(() => this.select(), 10);
         });
 
-        // 入力中: リアルタイム計算
         input.addEventListener('input', function() {
             calculate();
         });
 
-        // フォーカスが外れたとき: カンマ区切りのテキストに戻す
         input.addEventListener('blur', function() {
-            this.type = 'text'; // textタイプに戻す
+            this.type = 'text';
             const minVal = this.id === 'shieldCount' || this.id === 'spearCount' || this.id === 'archerCount' ? 0 : 1;
             const num = getNumericValue(this.id, minVal);
             this.value = formatWithCommas(num);
         });
     });
+
+    // コピーイベントの登録
+    setupCopyElement('joyShieldNum');
+    setupCopyElement('joySpearNum');
+    setupCopyElement('joyArcherNum');
+    setupCopyElement('bearShieldNum');
+    setupCopyElement('bearSpearNum');
+    setupCopyElement('bearArcherNum');
 
     // 初期起動時に計算を実行
     window.onload = calculate;
