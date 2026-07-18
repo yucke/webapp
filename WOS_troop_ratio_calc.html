@@ -127,6 +127,25 @@
             border-color: var(--accent-color);
         }
 
+        .input-with-unit {
+            position: relative;
+            display: flex;
+            align-items: center;
+        }
+
+        .input-with-unit input {
+            padding-right: 28px;
+        }
+
+        .input-unit {
+            position: absolute;
+            right: 10px;
+            font-size: 0.9rem;
+            font-weight: bold;
+            color: var(--muted-text);
+            pointer-events: none;
+        }
+
         .result-section-title {
             font-size: 0.85rem;
             color: var(--accent-color);
@@ -273,7 +292,7 @@
         </div>
     </div>
 
-    <!-- 容量設定入力 -->
+    <!-- 出征容量設定 -->
     <div class="card">
         <div class="card-title">出征容量設定</div>
         <div class="grid-2">
@@ -288,31 +307,40 @@
         </div>
     </div>
 
-    <!-- 熊罠専用 集結固定オプション -->
+    <!-- 熊罠専用 集結固定オプション（割合指定版） -->
     <div class="card" style="border-color: rgba(56, 189, 248, 0.4);">
         <div class="card-title">
-            熊罠 集結固定枠設定 <span class="mode-badge" style="background-color: rgba(245, 158, 11, 0.15); color: #f59e0b;">オプション</span>
+            熊罠 自分の集結割合設定 <span class="mode-badge" style="background-color: rgba(245, 158, 11, 0.15); color: #f59e0b;">オプション</span>
         </div>
         <p style="font-size: 0.75rem; color: var(--muted-text); margin-bottom: 12px;">
-            自分の集結部隊に特定の兵数を固定したい場合に入力します（空欄時は全軍均等分割）。
+            自分の集結部隊（1枠目）の割合を固定したい場合に入力します（空欄時は全軍均等分割）。
         </p>
         <div class="grid-3">
             <div class="form-group last">
-                <label for="bearFixShield" style="color: var(--shield-color);">集結固定 盾兵</label>
-                <input type="text" id="bearFixShield" value="" data-type="int" placeholder="0">
+                <label for="bearFixShield" style="color: var(--shield-color);">集結固定 盾割合</label>
+                <div class="input-with-unit">
+                    <input type="text" id="bearFixShield" value="" data-type="pct" placeholder="0">
+                    <span class="input-unit">%</span>
+                </div>
             </div>
             <div class="form-group last">
-                <label for="bearFixSpear" style="color: var(--spear-color);">集結固定 槍兵</label>
-                <input type="text" id="bearFixSpear" value="" data-type="int" placeholder="0">
+                <label for="bearFixSpear" style="color: var(--spear-color);">集結固定 槍割合</label>
+                <div class="input-with-unit">
+                    <input type="text" id="bearFixSpear" value="" data-type="pct" placeholder="0">
+                    <span class="input-unit">%</span>
+                </div>
             </div>
             <div class="form-group last">
-                <label for="bearFixArcher" style="color: var(--archer-color);">集結固定 弓兵</label>
-                <input type="text" id="bearFixArcher" value="" data-type="int" placeholder="0">
+                <label for="bearFixArcher" style="color: var(--archer-color);">集結固定 弓割合</label>
+                <div class="input-with-unit">
+                    <input type="text" id="bearFixArcher" value="" data-type="pct" placeholder="0">
+                    <span class="input-unit">%</span>
+                </div>
             </div>
         </div>
     </div>
 
-    <!-- クレイジージョイ結果（盾→槍→弓） -->
+    <!-- クレイジージョイ結果 -->
     <div class="card">
         <div class="card-title">
             クレイジージョイ
@@ -342,16 +370,16 @@
         <div class="hint-text" id="joyHint">※人数タップでコピー。</div>
     </div>
 
-    <!-- 熊罠結果（盾→槍→弓） -->
+    <!-- 熊罠結果 -->
     <div class="card">
         <div class="card-title">
             熊罠
             <span class="mode-badge" id="bearBadge">7行軍 / 優先: 弓→槍→盾</span>
         </div>
         
-        <!-- 集結固定枠用領域 -->
+        <!-- 集結部隊固定表示枠 -->
         <div id="bearRallySection" style="display: none; margin-bottom: 12px; border-bottom: 1px dashed var(--border-color); padding-bottom: 12px;">
-            <div class="result-section-title">【1枠目】自分の集結部隊（固定設定値）</div>
+            <div class="result-section-title">【1枠目】自分の集結部隊（指定割合）</div>
             <div class="result-row shield" style="opacity: 0.85;">
                 <div class="result-label">盾兵 (集結)</div>
                 <div class="result-values-box"><div class="result-pct" id="bearRallyShieldPct">0%</div><div class="result-num" id="bearRallyShieldNum" data-raw="0">0</div></div>
@@ -395,7 +423,7 @@
 <div id="toast" class="toast">コピーしました</div>
 
 <script>
-    const STORAGE_KEY = 'wos_march_calculator_data_v6_1';
+    const STORAGE_KEY = 'wos_march_calculator_data_v7';
 
     const defaults = {
         marchCount: "6",
@@ -411,8 +439,8 @@
 
     function getNumericValue(id, minVal = 0) {
         const input = document.getElementById(id);
-        const rawValue = input.value.replace(/,/g, '');
-        if (rawValue.trim() === "") return 0;
+        const rawValue = input.value.replace(/,/g, '').trim();
+        if (rawValue === "") return 0;
         const parsed = parseInt(rawValue, 10);
         return Math.max(minVal, isNaN(parsed) ? minVal : parsed);
     }
@@ -487,18 +515,28 @@
         const normalCapacity = getNumericValue('normalCapacity', 1);
         const bearCapacity = getNumericValue('bearCapacity', 1);
 
-        const bFixShieldRaw = getNumericValue('bearFixShield', 0);
-        const bFixSpearRaw = getNumericValue('bearFixSpear', 0);
-        const bFixArcherRaw = getNumericValue('bearFixArcher', 0);
-        
-        const hasBearFix = (bFixShieldRaw > 0 || bFixSpearRaw > 0 || bFixArcherRaw > 0);
+        // 熊罠固定枠（パーセンテージ）の取得
+        let bFixShieldPct = Math.max(0, getNumericValue('bearFixShield', 0));
+        let bFixSpearPct = Math.max(0, getNumericValue('bearFixSpear', 0));
+        let bFixArcherPct = Math.max(0, getNumericValue('bearFixArcher', 0));
 
+        // 合計が100%を超えないよう制御ガード
+        if (bFixShieldPct + bFixSpearPct + bFixArcherPct > 100) {
+            const total = bFixShieldPct + bFixSpearPct + bFixArcherPct;
+            bFixShieldPct = Math.floor((bFixShieldPct / total) * 100);
+            bFixSpearPct = Math.floor((bFixSpearPct / total) * 100);
+            bFixArcherPct = 100 - bFixShieldPct - bFixSpearPct;
+        }
+        
+        const hasBearFix = (bFixShieldPct > 0 || bFixSpearPct > 0 || bFixArcherPct > 0);
+
+        // UI表示の切り替え
         document.getElementById('joyBadge').textContent = `${marchCount}行軍 / 優先: 盾→槍→弓`;
         document.getElementById('joyHint').textContent = `※人数タップでコピー（一括設定は${marchCount}行軍）。`;
 
         if (hasBearFix) {
             document.getElementById('bearBadge').textContent = `集結別設定 / 優先: 弓→槍→盾`;
-            document.getElementById('bearHint').textContent = `※集結固定枠を除外した残りを、他人の集結へ参加する${marchCount}行軍に均等配分。`;
+            document.getElementById('bearHint').textContent = `※指定割合の集結枠を除外した残りを、他人の集結へ参加する${marchCount}行軍に均等配分。`;
             document.getElementById('bearRallySection').style.display = 'block';
             document.getElementById('bearNormalSectionTitle').textContent = `【残り${marchCount}枠】他人の集結への参加行軍（1部隊あたり）`;
         } else {
@@ -553,27 +591,17 @@
         let bearArcherPct = 0;
 
         if (hasBearFix) {
-            // --- オプション：集結固定ありのロジック ---
-            let rallyRemCap = bearCapacity;
-            
-            // 優先度(弓→槍→盾)に準じて出征枠に入る上限容量制限をかける
-            const bearRallyArcher = Math.min(bFixArcherRaw, rallyRemCap);
-            rallyRemCap -= bearRallyArcher;
-            
-            const bearRallySpear = Math.min(bFixSpearRaw, rallyRemCap);
-            rallyRemCap -= bearRallySpear;
-            
-            const bearRallyShield = Math.min(bFixShieldRaw, rallyRemCap);
-            rallyRemCap -= bearRallyShield;
+            // --- オプション：集結指定割合ありのロジック ---
+            // A. 指定された割合（%）から集結部隊の実際の「人数」を逆算
+            // 各兵種の人数 = ceil(容量 * 各割合 / 100) 
+            const bearRallyShield = Math.ceil((bearCapacity * bFixShieldPct) / 100);
+            const bearRallySpear = Math.ceil((bearCapacity * bFixSpearPct) / 100);
+            const bearRallyArcher = Math.ceil((bearCapacity * bFixArcherPct) / 100);
 
-            // 自分の集結割合計算 (優先度：弓→槍→盾 で確定、表示は盾→槍→弓)
-            const rArcherPct = Math.min(100, Math.ceil((bearRallyArcher / bearCapacity) * 100));
-            const rSpearPct = Math.min(100 - rArcherPct, Math.ceil((bearRallySpear / bearCapacity) * 100));
-            const rShieldPct = 100 - rArcherPct - rSpearPct;
-
-            document.getElementById('bearRallyShieldPct').textContent = rShieldPct + '%';
-            document.getElementById('bearRallySpearPct').textContent = rSpearPct + '%';
-            document.getElementById('bearRallyArcherPct').textContent = rArcherPct + '%';
+            // 自分の集結枠UIへ反映 (入力通りに100%に調整)
+            document.getElementById('bearRallyShieldPct').textContent = bFixShieldPct + '%';
+            document.getElementById('bearRallySpearPct').textContent = bFixSpearPct + '%';
+            document.getElementById('bearRallyArcherPct').textContent = bFixArcherPct + '%';
             
             const setRallyEl = (id, val) => {
                 const el = document.getElementById(id);
@@ -584,13 +612,15 @@
             setRallyEl('bearRallySpearNum', bearRallySpear);
             setRallyEl('bearRallyArcherNum', bearRallyArcher);
 
-            // B. 他人の集結へ参加する残りの通常行軍の計算
+            // B. 他人の集結へ参加する残りの通常行軍 (marchCount分) の計算
+            // 手持ちプールから集結で使った分を除外
             const remShieldPool = Math.max(0, shieldCount - bearRallyShield);
             const remSpearPool = Math.max(0, spearCount - bearRallySpear);
             const remArcherPool = Math.max(0, archerCount - bearRallyArcher);
 
             let remMarchCap = bearCapacity;
 
+            // 優先度：弓→槍→盾で残った容量を振り分け
             // 1. 弓兵
             const bArcherNeeded = Math.ceil(remArcherPool / marchCount);
             bearArcherPerMarch = Math.min(bArcherNeeded, remMarchCap);
@@ -605,7 +635,7 @@
             bearShieldPerMarch = remMarchCap;
 
         } else {
-            // --- 通常：均等分割ロジック ---
+            // --- 通常：均等分割ロジック (全員同じ割合) ---
             let bearRemCap = bearCapacity;
             
             const bearArcherNeeded = Math.ceil(archerCount / bearMarchCount);
@@ -619,7 +649,7 @@
             bearShieldPerMarch = bearRemCap;
         }
 
-        // 共通：参加枠（通常枠）の割合変換（優先度：弓→槍→盾、表示は盾→槍→弓）
+        // 共通：残りの参加枠（通常枠）の割合変換（優先度：弓→槍→盾、表示は盾→槍→弓）
         bearArcherPct = Math.min(100, Math.ceil((bearArcherPerMarch / bearCapacity) * 100));
         bearSpearPct = Math.min(100 - bearArcherPct, Math.ceil((bearSpearPerMarch / bearCapacity) * 100));
         bearShieldPct = 100 - bearArcherPct - bearSpearPct;
@@ -638,7 +668,8 @@
         updateBearEl('bearArcherNum', bearArcherPerMarch);
     }
 
-    document.querySelectorAll('input[data-type="int"]').forEach(input => {
+    // イベントリスナーの登録・制御
+    document.querySelectorAll('input[data-type="int"], input[data-type="pct"]').forEach(input => {
         input.addEventListener('focus', function() {
             const rawValue = this.value.replace(/,/g, '');
             this.value = rawValue;
@@ -653,14 +684,23 @@
 
         input.addEventListener('blur', function() {
             this.type = 'text';
-            const isCountField = (this.id === 'shieldCount' || this.id === 'spearCount' || this.id === 'archerCount' || this.id.startsWith('bearFix'));
-            const minVal = isCountField ? 0 : 1;
+            const dtype = this.getAttribute('data-type');
             
-            if(this.value.trim() === "" && this.id.startsWith('bearFix')) {
-                this.value = "";
+            if (dtype === 'pct') {
+                // パーセンテージ入力欄の処理
+                let num = parseInt(this.value, 10);
+                if (isNaN(num) || num <= 0) {
+                    this.value = "";
+                } else {
+                    if (num > 100) num = 100;
+                    this.value = num;
+                }
             } else {
+                // 通常のカンマ区切り数値欄の処理
+                const isCountField = (this.id === 'shieldCount' || this.id === 'spearCount' || this.id === 'archerCount');
+                const minVal = isCountField ? 0 : 1;
                 const num = getNumericValue(this.id, minVal);
-                this.value = (this.id.startsWith('bearFix') && num === 0) ? "" : formatWithCommas(num);
+                this.value = formatWithCommas(num);
             }
             saveToStorage();
         });
