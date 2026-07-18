@@ -127,6 +127,13 @@
             border-color: var(--accent-color);
         }
 
+        .result-section-title {
+            font-size: 0.85rem;
+            color: var(--accent-color);
+            margin: 12px 0 6px 0;
+            font-weight: bold;
+        }
+
         .result-row {
             display: flex;
             align-items: center;
@@ -281,6 +288,30 @@
         </div>
     </div>
 
+    <!-- 熊罠専用 集結固定オプション -->
+    <div class="card" style="border-color: rgba(56, 189, 248, 0.4);">
+        <div class="card-title">
+            熊罠 集結固定枠設定 <span class="mode-badge" style="background-color: rgba(245, 158, 11, 0.15); color: #f59e0b;">オプション</span>
+        </div>
+        <p style="font-size: 0.75rem; color: var(--muted-text); margin-bottom: 12px;">
+            自分の集結部隊に特定の兵数を固定したい場合に入力します（空欄時は全軍均等分割）。
+        </p>
+        <div class="grid-3">
+            <div class="form-group last">
+                <label for="bearFixShield" style="color: var(--shield-color);">集結固定 盾兵</label>
+                <input type="text" id="bearFixShield" value="" data-type="int" placeholder="0">
+            </div>
+            <div class="form-group last">
+                <label for="bearFixSpear" style="color: var(--spear-color);">集結固定 槍兵</label>
+                <input type="text" id="bearFixSpear" value="" data-type="int" placeholder="0">
+            </div>
+            <div class="form-group last">
+                <label for="bearFixArcher" style="color: var(--archer-color);">集結固定 弓兵</label>
+                <input type="text" id="bearFixArcher" value="" data-type="int" placeholder="0">
+            </div>
+        </div>
+    </div>
+
     <!-- クレイジージョイ結果（盾→槍→弓） -->
     <div class="card">
         <div class="card-title">
@@ -308,7 +339,7 @@
                 <div class="result-num" id="joyArcherNum" data-raw="0" title="タップしてコピー">0</div>
             </div>
         </div>
-        <div class="hint-text" id="joyHint">※人数タップでカンマ無しの数値をコピー。</div>
+        <div class="hint-text" id="joyHint">※人数タップでコピー。</div>
     </div>
 
     <!-- 熊罠結果（盾→槍→弓） -->
@@ -317,6 +348,25 @@
             熊罠
             <span class="mode-badge" id="bearBadge">7行軍 / 優先: 弓→槍→盾</span>
         </div>
+        
+        <!-- 集結固定枠用領域 -->
+        <div id="bearRallySection" style="display: none; margin-bottom: 12px; border-bottom: 1px dashed var(--border-color); padding-bottom: 12px;">
+            <div class="result-section-title">【1枠目】自分の集結部隊（固定設定値）</div>
+            <div class="result-row shield" style="opacity: 0.85;">
+                <div class="result-label">盾兵 (集結)</div>
+                <div class="result-values-box"><div class="result-pct" id="bearRallyShieldPct">0%</div><div class="result-num" id="bearRallyShieldNum" data-raw="0">0</div></div>
+            </div>
+            <div class="result-row spear" style="opacity: 0.85;">
+                <div class="result-label">槍兵 (集結)</div>
+                <div class="result-values-box"><div class="result-pct" id="bearRallySpearPct">0%</div><div class="result-num" id="bearRallySpearNum" data-raw="0">0</div></div>
+            </div>
+            <div class="result-row archer" style="opacity: 0.85;">
+                <div class="result-label">弓兵 (集結)</div>
+                <div class="result-values-box"><div class="result-pct" id="bearRallyArcherPct">0%</div><div class="result-num" id="bearRallyArcherNum" data-raw="0">0</div></div>
+            </div>
+        </div>
+
+        <div class="result-section-title" id="bearNormalSectionTitle">各行軍の編成割合・人数</div>
         <div class="result-row shield">
             <div class="result-label">盾兵</div>
             <div class="result-values-box">
@@ -338,50 +388,46 @@
                 <div class="result-num" id="bearArcherNum" data-raw="0" title="タップしてコピー">0</div>
             </div>
         </div>
-        <div class="hint-text" id="bearHint">※入力した数値は自動的にブラウザに保存されます。</div>
+        <div class="hint-text" id="bearHint">※自動でブラウザに保存されます。</div>
     </div>
 </div>
 
 <div id="toast" class="toast">コピーしました</div>
 
 <script>
-    // ローカルストレージ用のキー
-    const STORAGE_KEY = 'wos_march_calculator_data';
+    const STORAGE_KEY = 'wos_march_calculator_data_v6_1';
 
-    // デフォルト値
     const defaults = {
         marchCount: "6",
         shieldCount: "300,000",
         spearCount: "300,000",
         archerCount: "400,000",
         normalCapacity: "130,000",
-        bearCapacity: "160,000"
+        bearCapacity: "160,000",
+        bearFixShield: "",
+        bearFixSpear: "",
+        bearFixArcher: ""
     };
 
-    // カンマを除去して数値化する関数
     function getNumericValue(id, minVal = 0) {
         const input = document.getElementById(id);
         const rawValue = input.value.replace(/,/g, '');
+        if (rawValue.trim() === "") return 0;
         const parsed = parseInt(rawValue, 10);
         return Math.max(minVal, isNaN(parsed) ? minVal : parsed);
     }
 
-    // 数値をカンマ区切りの文字列にする関数
     function formatWithCommas(num) {
         return num.toLocaleString();
     }
 
-    // コピートースト表示関数
     function showToast(text) {
         const toast = document.getElementById('toast');
         toast.textContent = text;
         toast.classList.add('show');
-        setTimeout(() => {
-            toast.classList.remove('show');
-        }, 1800);
+        setTimeout(() => { toast.classList.remove('show'); }, 1800);
     }
 
-    // クリップボードコピー関数
     function setupCopyElement(elementId) {
         const el = document.getElementById(elementId);
         el.addEventListener('click', function() {
@@ -389,12 +435,8 @@
             if (navigator.clipboard && navigator.clipboard.writeText) {
                 navigator.clipboard.writeText(val).then(() => {
                     showToast(`${formatWithCommas(parseInt(val))} をコピーしました`);
-                }).catch(() => {
-                    fallbackCopy(val);
-                });
-            } else {
-                fallbackCopy(val);
-            }
+                }).catch(() => { fallbackCopy(val); });
+            } else { fallbackCopy(val); }
         });
     }
 
@@ -408,26 +450,18 @@
         try {
             document.execCommand('copy');
             showToast(`${formatWithCommas(parseInt(text))} をコピーしました`);
-        } catch (err) {
-            showToast("コピーに失敗しました");
-        }
+        } catch (err) { showToast("コピーに失敗しました"); }
         document.body.removeChild(textArea);
     }
 
-    // データをLocalStorageへ保存
     function saveToStorage() {
-        const data = {
-            marchCount: document.getElementById('marchCount').value,
-            shieldCount: document.getElementById('shieldCount').value,
-            spearCount: document.getElementById('spearCount').value,
-            archerCount: document.getElementById('archerCount').value,
-            normalCapacity: document.getElementById('normalCapacity').value,
-            bearCapacity: document.getElementById('bearCapacity').value
-        };
+        const data = {};
+        for (const key in defaults) {
+            data[key] = document.getElementById(key).value;
+        }
         localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
     }
 
-    // データをLocalStorageからロード
     function loadFromStorage() {
         const saved = localStorage.getItem(STORAGE_KEY);
         if (saved) {
@@ -438,14 +472,11 @@
                         document.getElementById(key).value = data[key];
                     }
                 }
-            } catch (e) {
-                console.error("Storage load error", e);
-            }
+            } catch (e) { console.error("Storage load error", e); }
         }
     }
 
     function calculate() {
-        // 数値の取得
         const marchCount = getNumericValue('marchCount', 1);
         const bearMarchCount = marchCount + 1;
 
@@ -456,14 +487,30 @@
         const normalCapacity = getNumericValue('normalCapacity', 1);
         const bearCapacity = getNumericValue('bearCapacity', 1);
 
-        // バッジとヒントテキストの動的更新
-        document.getElementById('joyBadge').textContent = `${marchCount}行軍 / 優先: 盾→槍→弓`;
-        document.getElementById('joyHint').textContent = `※人数タップでカンマ無しの数値をコピー（一括設定は${marchCount}行軍）。`;
+        const bFixShieldRaw = getNumericValue('bearFixShield', 0);
+        const bFixSpearRaw = getNumericValue('bearFixSpear', 0);
+        const bFixArcherRaw = getNumericValue('bearFixArcher', 0);
         
-        document.getElementById('bearBadge').textContent = `${bearMarchCount}行軍 / 優先: 弓→槍→盾`;
-        document.getElementById('bearHint').textContent = `※人数タップでカンマ無しの数値をコピー（集結1枠＋参加${marchCount}枠）。`;
+        const hasBearFix = (bFixShieldRaw > 0 || bFixSpearRaw > 0 || bFixArcherRaw > 0);
 
-        // --- クレイジージョイの計算 (優先度: 盾→槍→弓) ---
+        document.getElementById('joyBadge').textContent = `${marchCount}行軍 / 優先: 盾→槍→弓`;
+        document.getElementById('joyHint').textContent = `※人数タップでコピー（一括設定は${marchCount}行軍）。`;
+
+        if (hasBearFix) {
+            document.getElementById('bearBadge').textContent = `集結別設定 / 優先: 弓→槍→盾`;
+            document.getElementById('bearHint').textContent = `※集結固定枠を除外した残りを、他人の集結へ参加する${marchCount}行軍に均等配分。`;
+            document.getElementById('bearRallySection').style.display = 'block';
+            document.getElementById('bearNormalSectionTitle').textContent = `【残り${marchCount}枠】他人の集結への参加行軍（1部隊あたり）`;
+        } else {
+            document.getElementById('bearBadge').textContent = `${bearMarchCount}行軍 / 優先: 弓→槍→盾`;
+            document.getElementById('bearHint').textContent = `※人数タップでコピー（自分の集結1枠＋参加${marchCount}枠＝計${bearMarchCount}行軍に等分設定）。`;
+            document.getElementById('bearRallySection').style.display = 'none';
+            document.getElementById('bearNormalSectionTitle').textContent = `各行軍の編成割合・人数`;
+        }
+
+        // ==========================================
+        // 1. クレイジージョイの計算 (優先度: 盾→槍→弓)
+        // ==========================================
         let joyRemCap = normalCapacity;
         
         const joyShieldNeeded = Math.ceil(shieldCount / marchCount);
@@ -484,54 +531,113 @@
         document.getElementById('joySpearPct').textContent = joySpearPct + '%';
         document.getElementById('joyArcherPct').textContent = joyArcherPct + '%';
 
-        const jsNum = document.getElementById('joyShieldNum');
-        jsNum.textContent = formatWithCommas(joyShieldPerMarch);
-        jsNum.setAttribute('data-raw', joyShieldPerMarch);
-
-        const jspNum = document.getElementById('joySpearNum');
-        jspNum.textContent = formatWithCommas(joySpearPerMarch);
-        jspNum.setAttribute('data-raw', joySpearPerMarch);
-
-        const jaNum = document.getElementById('joyArcherNum');
-        jaNum.textContent = formatWithCommas(joyArcherPerMarch);
-        jaNum.setAttribute('data-raw', joyArcherPerMarch);
+        const updateJoyEl = (id, val) => {
+            const el = document.getElementById(id);
+            el.textContent = formatWithCommas(val);
+            el.setAttribute('data-raw', val);
+        };
+        updateJoyEl('joyShieldNum', joyShieldPerMarch);
+        updateJoyEl('joySpearNum', joySpearPerMarch);
+        updateJoyEl('joyArcherNum', joyArcherPerMarch);
 
 
-        // --- 熊罠の計算 (優先度: 弓→槍→盾) ---
-        let bearRemCap = bearCapacity;
-        
-        const bearArcherNeeded = Math.ceil(archerCount / bearMarchCount);
-        const bearArcherPerMarch = Math.min(bearArcherNeeded, bearRemCap);
-        bearRemCap -= bearArcherPerMarch;
-        
-        const bearSpearNeeded = Math.ceil(spearCount / bearMarchCount);
-        const bearSpearPerMarch = Math.min(bearSpearNeeded, bearRemCap);
-        bearRemCap -= bearSpearPerMarch;
-        
-        const bearShieldPerMarch = bearRemCap;
+        // ==========================================
+        // 2. 熊罠の計算 (優先度: 弓→槍→盾)
+        // ==========================================
+        let bearShieldPerMarch = 0;
+        let bearSpearPerMarch = 0;
+        let bearArcherPerMarch = 0;
 
-        const bearArcherPct = Math.min(100, Math.ceil((bearArcherPerMarch / bearCapacity) * 100));
-        const bearSpearPct = Math.min(100 - bearArcherPct, Math.ceil((bearSpearPerMarch / bearCapacity) * 100));
-        const bearShieldPct = 100 - bearArcherPct - bearSpearPct;
+        let bearShieldPct = 0;
+        let bearSpearPct = 0;
+        let bearArcherPct = 0;
+
+        if (hasBearFix) {
+            // --- オプション：集結固定ありのロジック ---
+            let rallyRemCap = bearCapacity;
+            
+            // 優先度(弓→槍→盾)に準じて出征枠に入る上限容量制限をかける
+            const bearRallyArcher = Math.min(bFixArcherRaw, rallyRemCap);
+            rallyRemCap -= bearRallyArcher;
+            
+            const bearRallySpear = Math.min(bFixSpearRaw, rallyRemCap);
+            rallyRemCap -= bearRallySpear;
+            
+            const bearRallyShield = Math.min(bFixShieldRaw, rallyRemCap);
+            rallyRemCap -= bearRallyShield;
+
+            // 自分の集結割合計算 (優先度：弓→槍→盾 で確定、表示は盾→槍→弓)
+            const rArcherPct = Math.min(100, Math.ceil((bearRallyArcher / bearCapacity) * 100));
+            const rSpearPct = Math.min(100 - rArcherPct, Math.ceil((bearRallySpear / bearCapacity) * 100));
+            const rShieldPct = 100 - rArcherPct - rSpearPct;
+
+            document.getElementById('bearRallyShieldPct').textContent = rShieldPct + '%';
+            document.getElementById('bearRallySpearPct').textContent = rSpearPct + '%';
+            document.getElementById('bearRallyArcherPct').textContent = rArcherPct + '%';
+            
+            const setRallyEl = (id, val) => {
+                const el = document.getElementById(id);
+                el.textContent = formatWithCommas(val);
+                el.setAttribute('data-raw', val);
+            };
+            setRallyEl('bearRallyShieldNum', bearRallyShield);
+            setRallyEl('bearRallySpearNum', bearRallySpear);
+            setRallyEl('bearRallyArcherNum', bearRallyArcher);
+
+            // B. 他人の集結へ参加する残りの通常行軍の計算
+            const remShieldPool = Math.max(0, shieldCount - bearRallyShield);
+            const remSpearPool = Math.max(0, spearCount - bearRallySpear);
+            const remArcherPool = Math.max(0, archerCount - bearRallyArcher);
+
+            let remMarchCap = bearCapacity;
+
+            // 1. 弓兵
+            const bArcherNeeded = Math.ceil(remArcherPool / marchCount);
+            bearArcherPerMarch = Math.min(bArcherNeeded, remMarchCap);
+            remMarchCap -= bearArcherPerMarch;
+
+            // 2. 槍兵
+            const bSpearNeeded = Math.ceil(remSpearPool / marchCount);
+            bearSpearPerMarch = Math.min(bSpearNeeded, remMarchCap);
+            remMarchCap -= bearSpearPerMarch;
+
+            // 3. 盾兵
+            bearShieldPerMarch = remMarchCap;
+
+        } else {
+            // --- 通常：均等分割ロジック ---
+            let bearRemCap = bearCapacity;
+            
+            const bearArcherNeeded = Math.ceil(archerCount / bearMarchCount);
+            bearArcherPerMarch = Math.min(bearArcherNeeded, bearRemCap);
+            bearRemCap -= bearArcherPerMarch;
+            
+            const bearSpearNeeded = Math.ceil(spearCount / bearMarchCount);
+            bearSpearPerMarch = Math.min(bearSpearNeeded, bearRemCap);
+            bearRemCap -= bearSpearPerMarch;
+            
+            bearShieldPerMarch = bearRemCap;
+        }
+
+        // 共通：参加枠（通常枠）の割合変換（優先度：弓→槍→盾、表示は盾→槍→弓）
+        bearArcherPct = Math.min(100, Math.ceil((bearArcherPerMarch / bearCapacity) * 100));
+        bearSpearPct = Math.min(100 - bearArcherPct, Math.ceil((bearSpearPerMarch / bearCapacity) * 100));
+        bearShieldPct = 100 - bearArcherPct - bearSpearPct;
 
         document.getElementById('bearShieldPct').textContent = bearShieldPct + '%';
         document.getElementById('bearSpearPct').textContent = bearSpearPct + '%';
         document.getElementById('bearArcherPct').textContent = bearArcherPct + '%';
 
-        const bsNum = document.getElementById('bearShieldNum');
-        bsNum.textContent = formatWithCommas(bearShieldPerMarch);
-        bsNum.setAttribute('data-raw', bearShieldPerMarch);
-
-        const bspNum = document.getElementById('bearSpearNum');
-        bspNum.textContent = formatWithCommas(bearSpearPerMarch);
-        bspNum.setAttribute('data-raw', bearSpearPerMarch);
-
-        const baNum = document.getElementById('bearArcherNum');
-        baNum.textContent = formatWithCommas(bearArcherPerMarch);
-        baNum.setAttribute('data-raw', bearArcherPerMarch);
+        const updateBearEl = (id, val) => {
+            const el = document.getElementById(id);
+            el.textContent = formatWithCommas(val);
+            el.setAttribute('data-raw', val);
+        };
+        updateBearEl('bearShieldNum', bearShieldPerMarch);
+        updateBearEl('bearSpearNum', bearSpearPerMarch);
+        updateBearEl('bearArcherNum', bearArcherPerMarch);
     }
 
-    // イベントリスナーの一括設定
     document.querySelectorAll('input[data-type="int"]').forEach(input => {
         input.addEventListener('focus', function() {
             const rawValue = this.value.replace(/,/g, '');
@@ -542,29 +648,37 @@
 
         input.addEventListener('input', function() {
             calculate();
-            saveToStorage(); // 入力するたびに保存
+            saveToStorage();
         });
 
         input.addEventListener('blur', function() {
             this.type = 'text';
-            const minVal = this.id === 'shieldCount' || this.id === 'spearCount' || this.id === 'archerCount' ? 0 : 1;
-            const num = getNumericValue(this.id, minVal);
-            this.value = formatWithCommas(num);
-            saveToStorage(); // フォーカスが外れてカンマが付いた状態も保存
+            const isCountField = (this.id === 'shieldCount' || this.id === 'spearCount' || this.id === 'archerCount' || this.id.startsWith('bearFix'));
+            const minVal = isCountField ? 0 : 1;
+            
+            if(this.value.trim() === "" && this.id.startsWith('bearFix')) {
+                this.value = "";
+            } else {
+                const num = getNumericValue(this.id, minVal);
+                this.value = (this.id.startsWith('bearFix') && num === 0) ? "" : formatWithCommas(num);
+            }
+            saveToStorage();
         });
     });
 
-    setupCopyElement('joyShieldNum');
-    setupCopyElement('joySpearNum');
-    setupCopyElement('joyArcherNum');
-    setupCopyElement('bearShieldNum');
-    setupCopyElement('bearSpearNum');
-    setupCopyElement('bearArcherNum');
+    ['joyShieldNum', 'joySpearNum', 'joyArcherNum', 
+     'bearShieldNum', 'bearSpearNum', 'bearArcherNum',
+     'bearRallyShieldNum', 'bearRallySpearNum', 'bearRallyArcherNum'].forEach(setupCopyElement);
 
-    // 初期起動時の処理
     window.onload = function() {
-        loadFromStorage(); // まずデータを読み込む
-        calculate();       // 計算する
+        loadFromStorage();
+        document.querySelectorAll('input[data-type="int"]').forEach(input => {
+            if(input.value.trim() !== "") {
+                const num = parseInt(input.value.replace(/,/g, ''), 10);
+                if(!isNaN(num)) input.value = num.toLocaleString();
+            }
+        });
+        calculate();
     };
 </script>
 
