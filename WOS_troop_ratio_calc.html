@@ -82,6 +82,21 @@
             color: var(--accent-color);
         }
 
+        .btn-toggle-tier {
+            background-color: transparent;
+            border: 1px solid var(--border-color);
+            color: var(--accent-color);
+            font-size: 0.75rem;
+            padding: 2px 8px;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .btn-toggle-tier:hover {
+            background-color: rgba(56, 189, 248, 0.1);
+        }
+
         .grid-3 {
             display: grid;
             grid-template-columns: repeat(3, 1fr);
@@ -109,32 +124,50 @@
             margin-bottom: 4px;
         }
 
-        input[type="text"] {
+        /* 入力欄の幅固定用統合スタイル (type=text, number共通) */
+        input[type="text"],
+        input[type="number"] {
+            display: block;
             width: 100%;
+            height: 42px; /* 高さを固定 */
+            box-sizing: border-box;
             background-color: var(--bg-color);
             border: 1px solid var(--border-color);
             border-radius: 6px;
-            padding: 10px;
+            padding: 0 10px;
             color: var(--text-color);
             font-size: 1rem;
             font-weight: bold;
             text-align: right;
-            transition: border-color 0.2s;
+            font-family: inherit;
+            transition: border-color 0.2s, background-color 0.2s;
+            -webkit-appearance: none;
+            -moz-appearance: textfield;
+            appearance: none;
         }
 
-        input[type="text"]:focus {
+        input[type="text"]:focus,
+        input[type="number"]:focus {
             outline: none;
             border-color: var(--accent-color);
+        }
+
+        /* スピンボタン（上下矢印）非表示 */
+        input::-webkit-outer-spin-button,
+        input::-webkit-inner-spin-button {
+            -webkit-appearance: none;
+            margin: 0;
         }
 
         .input-with-unit {
             position: relative;
             display: flex;
             align-items: center;
+            width: 100%;
         }
 
         .input-with-unit input {
-            padding-right: 28px;
+            padding-right: 28px !important;
         }
 
         .input-unit {
@@ -144,6 +177,88 @@
             font-weight: bold;
             color: var(--muted-text);
             pointer-events: none;
+        }
+
+        /* Tier内訳アコーディオンのスタイル */
+        .tier-accordion {
+            display: none;
+            background-color: rgba(15, 23, 42, 0.6);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 12px;
+            margin-top: 12px;
+        }
+
+        .tier-accordion.open {
+            display: block;
+        }
+
+        .tier-row-item {
+            margin-bottom: 8px;
+            padding-bottom: 8px;
+            border-bottom: 1px dashed rgba(51, 65, 85, 0.5);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .tier-row-item:last-child {
+            margin-bottom: 0;
+            padding-bottom: 0;
+            border-bottom: none;
+        }
+
+        .tier-row-title {
+            font-size: 0.85rem;
+            font-weight: bold;
+            color: var(--accent-color);
+            min-width: 32px;
+        }
+
+        .tier-row-inputs {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 8px;
+            flex-grow: 1;
+        }
+
+        .tier-input-box input {
+            height: 32px; /* Tier入力欄の固定高さ */
+            padding: 0 6px;
+            font-size: 0.85rem;
+        }
+
+        .tier-input-box.shield input {
+            background-color: rgba(239, 68, 68, 0.12);
+            border: 1px solid rgba(239, 68, 68, 0.35);
+            color: #fca5a5;
+        }
+
+        .tier-input-box.spear input {
+            background-color: rgba(16, 185, 129, 0.12);
+            border: 1px solid rgba(16, 185, 129, 0.35);
+            color: #6ee7b7;
+        }
+
+        .tier-input-box.archer input {
+            background-color: rgba(245, 158, 11, 0.12);
+            border: 1px solid rgba(245, 158, 11, 0.35);
+            color: #fcd34d;
+        }
+
+        .tier-input-box.shield input:focus {
+            border-color: var(--shield-color);
+            background-color: rgba(239, 68, 68, 0.22);
+        }
+
+        .tier-input-box.spear input:focus {
+            border-color: var(--spear-color);
+            background-color: rgba(16, 185, 129, 0.22);
+        }
+
+        .tier-input-box.archer input:focus {
+            border-color: var(--archer-color);
+            background-color: rgba(245, 158, 11, 0.22);
         }
 
         .result-section-title {
@@ -275,20 +390,33 @@
 
     <!-- 手持ち兵士数入力（盾→槍→弓） -->
     <div class="card">
-        <div class="card-title">手持ち兵士数</div>
+        <div class="card-title">
+            手持ち兵士数
+            <button class="btn-toggle-tier" onclick="toggleTierAccordion()">Tier別内訳を入力▼</button>
+        </div>
+        
         <div class="grid-3">
             <div class="form-group">
-                <label for="shieldCount" style="color: var(--shield-color);">盾兵数</label>
+                <label for="shieldCount" style="color: var(--shield-color);">盾兵 合計</label>
                 <input type="text" id="shieldCount" value="300,000" data-type="int">
             </div>
             <div class="form-group">
-                <label for="spearCount" style="color: var(--spear-color);">槍兵数</label>
+                <label for="spearCount" style="color: var(--spear-color);">槍兵 合計</label>
                 <input type="text" id="spearCount" value="300,000" data-type="int">
             </div>
             <div class="form-group">
-                <label for="archerCount" style="color: var(--archer-color);">弓兵数</label>
+                <label for="archerCount" style="color: var(--archer-color);">弓兵 合計</label>
                 <input type="text" id="archerCount" value="400,000" data-type="int">
             </div>
+        </div>
+
+        <!-- Tier別内訳エリア -->
+        <div class="tier-accordion" id="tierAccordion">
+            <div style="font-size: 0.8rem; font-weight: bold; margin-bottom: 10px; color: var(--accent-color); display: flex; justify-content: space-between;">
+                <span>Tier別内訳</span>
+                <span style="font-size: 0.7rem; color: var(--muted-text);">左から: <span style="color:var(--shield-color)">盾</span> / <span style="color:var(--spear-color)">槍</span> / <span style="color:var(--archer-color)">弓</span></span>
+            </div>
+            <div id="tierRowsContainer"></div>
         </div>
     </div>
 
@@ -423,7 +551,8 @@
 <div id="toast" class="toast">コピーしました</div>
 
 <script>
-    const STORAGE_KEY = 'wos_march_calculator_data_v7';
+    const STORAGE_KEY = 'wos_march_calculator_data_v11';
+    const TIERS = [11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1];
 
     const defaults = {
         marchCount: "6",
@@ -437,8 +566,44 @@
         bearFixArcher: ""
     };
 
+    function initTierRows() {
+        const container = document.getElementById('tierRowsContainer');
+        container.innerHTML = '';
+
+        TIERS.forEach(t => {
+            const rowDiv = document.createElement('div');
+            rowDiv.className = 'tier-row-item';
+
+            ['shield', 'spear', 'archer'].forEach(type => {
+                defaults[`${type}T${t}`] = "";
+            });
+
+            rowDiv.innerHTML = `
+                <div class="tier-row-title">T${t}</div>
+                <div class="tier-row-inputs">
+                    <div class="tier-input-box shield">
+                        <input type="text" id="shieldT${t}" data-type="tier" data-troop="shield" placeholder="0">
+                    </div>
+                    <div class="tier-input-box spear">
+                        <input type="text" id="spearT${t}" data-type="tier" data-troop="spear" placeholder="0">
+                    </div>
+                    <div class="tier-input-box archer">
+                        <input type="text" id="archerT${t}" data-type="tier" data-troop="archer" placeholder="0">
+                    </div>
+                </div>
+            `;
+            container.appendChild(rowDiv);
+        });
+    }
+
+    function toggleTierAccordion() {
+        const acc = document.getElementById('tierAccordion');
+        acc.classList.toggle('open');
+    }
+
     function getNumericValue(id, minVal = 0) {
         const input = document.getElementById(id);
+        if(!input) return 0;
         const rawValue = input.value.replace(/,/g, '').trim();
         if (rawValue === "") return 0;
         const parsed = parseInt(rawValue, 10);
@@ -458,6 +623,7 @@
 
     function setupCopyElement(elementId) {
         const el = document.getElementById(elementId);
+        if(!el) return;
         el.addEventListener('click', function() {
             const val = this.getAttribute('data-raw');
             if (navigator.clipboard && navigator.clipboard.writeText) {
@@ -485,7 +651,8 @@
     function saveToStorage() {
         const data = {};
         for (const key in defaults) {
-            data[key] = document.getElementById(key).value;
+            const el = document.getElementById(key);
+            if(el) data[key] = el.value;
         }
         localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
     }
@@ -497,10 +664,28 @@
                 const data = JSON.parse(saved);
                 for (const key in defaults) {
                     if (data[key] !== undefined) {
-                        document.getElementById(key).value = data[key];
+                        const el = document.getElementById(key);
+                        if(el) el.value = data[key];
                     }
                 }
             } catch (e) { console.error("Storage load error", e); }
+        }
+    }
+
+    function updateTroopTotalFromTiers(troopType) {
+        let sum = 0;
+        let hasAnyTierValue = false;
+        TIERS.forEach(t => {
+            const val = getNumericValue(`${troopType}T${t}`, 0);
+            sum += val;
+            if(document.getElementById(`${troopType}T${t}`).value.trim() !== "") {
+                hasAnyTierValue = true;
+            }
+        });
+
+        if(hasAnyTierValue) {
+            const totalInput = document.getElementById(`${troopType}Count`);
+            totalInput.value = formatWithCommas(sum);
         }
     }
 
@@ -515,12 +700,10 @@
         const normalCapacity = getNumericValue('normalCapacity', 1);
         const bearCapacity = getNumericValue('bearCapacity', 1);
 
-        // 熊罠固定枠（パーセンテージ）の取得
         let bFixShieldPct = Math.max(0, getNumericValue('bearFixShield', 0));
         let bFixSpearPct = Math.max(0, getNumericValue('bearFixSpear', 0));
         let bFixArcherPct = Math.max(0, getNumericValue('bearFixArcher', 0));
 
-        // 合計が100%を超えないよう制御ガード
         if (bFixShieldPct + bFixSpearPct + bFixArcherPct > 100) {
             const total = bFixShieldPct + bFixSpearPct + bFixArcherPct;
             bFixShieldPct = Math.floor((bFixShieldPct / total) * 100);
@@ -530,7 +713,6 @@
         
         const hasBearFix = (bFixShieldPct > 0 || bFixSpearPct > 0 || bFixArcherPct > 0);
 
-        // UI表示の切り替え
         document.getElementById('joyBadge').textContent = `${marchCount}行軍 / 優先: 盾→槍→弓`;
         document.getElementById('joyHint').textContent = `※人数タップでコピー（一括設定は${marchCount}行軍）。`;
 
@@ -546,9 +728,7 @@
             document.getElementById('bearNormalSectionTitle').textContent = `各行軍の編成割合・人数`;
         }
 
-        // ==========================================
-        // 1. クレイジージョイの計算 (優先度: 盾→槍→弓)
-        // ==========================================
+        // 1. クレイジージョイの計算
         let joyRemCap = normalCapacity;
         
         const joyShieldNeeded = Math.ceil(shieldCount / marchCount);
@@ -579,9 +759,7 @@
         updateJoyEl('joyArcherNum', joyArcherPerMarch);
 
 
-        // ==========================================
-        // 2. 熊罠の計算 (優先度: 弓→槍→盾)
-        // ==========================================
+        // 2. 熊罠の計算
         let bearShieldPerMarch = 0;
         let bearSpearPerMarch = 0;
         let bearArcherPerMarch = 0;
@@ -591,14 +769,10 @@
         let bearArcherPct = 0;
 
         if (hasBearFix) {
-            // --- オプション：集結指定割合ありのロジック ---
-            // A. 指定された割合（%）から集結部隊の実際の「人数」を逆算
-            // 各兵種の人数 = ceil(容量 * 各割合 / 100) 
             const bearRallyShield = Math.ceil((bearCapacity * bFixShieldPct) / 100);
             const bearRallySpear = Math.ceil((bearCapacity * bFixSpearPct) / 100);
             const bearRallyArcher = Math.ceil((bearCapacity * bFixArcherPct) / 100);
 
-            // 自分の集結枠UIへ反映 (入力通りに100%に調整)
             document.getElementById('bearRallyShieldPct').textContent = bFixShieldPct + '%';
             document.getElementById('bearRallySpearPct').textContent = bFixSpearPct + '%';
             document.getElementById('bearRallyArcherPct').textContent = bFixArcherPct + '%';
@@ -612,30 +786,23 @@
             setRallyEl('bearRallySpearNum', bearRallySpear);
             setRallyEl('bearRallyArcherNum', bearRallyArcher);
 
-            // B. 他人の集結へ参加する残りの通常行軍 (marchCount分) の計算
-            // 手持ちプールから集結で使った分を除外
             const remShieldPool = Math.max(0, shieldCount - bearRallyShield);
             const remSpearPool = Math.max(0, spearCount - bearRallySpear);
             const remArcherPool = Math.max(0, archerCount - bearRallyArcher);
 
             let remMarchCap = bearCapacity;
 
-            // 優先度：弓→槍→盾で残った容量を振り分け
-            // 1. 弓兵
             const bArcherNeeded = Math.ceil(remArcherPool / marchCount);
             bearArcherPerMarch = Math.min(bArcherNeeded, remMarchCap);
             remMarchCap -= bearArcherPerMarch;
 
-            // 2. 槍兵
             const bSpearNeeded = Math.ceil(remSpearPool / marchCount);
             bearSpearPerMarch = Math.min(bSpearNeeded, remMarchCap);
             remMarchCap -= bearSpearPerMarch;
 
-            // 3. 盾兵
             bearShieldPerMarch = remMarchCap;
 
         } else {
-            // --- 通常：均等分割ロジック (全員同じ割合) ---
             let bearRemCap = bearCapacity;
             
             const bearArcherNeeded = Math.ceil(archerCount / bearMarchCount);
@@ -649,7 +816,6 @@
             bearShieldPerMarch = bearRemCap;
         }
 
-        // 共通：残りの参加枠（通常枠）の割合変換（優先度：弓→槍→盾、表示は盾→槍→弓）
         bearArcherPct = Math.min(100, Math.ceil((bearArcherPerMarch / bearCapacity) * 100));
         bearSpearPct = Math.min(100 - bearArcherPct, Math.ceil((bearSpearPerMarch / bearCapacity) * 100));
         bearShieldPct = 100 - bearArcherPct - bearSpearPct;
@@ -668,54 +834,64 @@
         updateBearEl('bearArcherNum', bearArcherPerMarch);
     }
 
-    // イベントリスナーの登録・制御
-    document.querySelectorAll('input[data-type="int"], input[data-type="pct"]').forEach(input => {
-        input.addEventListener('focus', function() {
-            const rawValue = this.value.replace(/,/g, '');
-            this.value = rawValue;
-            this.type = 'number';
-            setTimeout(() => this.select(), 10);
-        });
+    function setupInputEvents() {
+        document.querySelectorAll('input[data-type]').forEach(input => {
+            input.addEventListener('focus', function() {
+                const rawValue = this.value.replace(/,/g, '');
+                this.value = rawValue;
+                this.type = 'number';
+                setTimeout(() => this.select(), 10);
+            });
 
-        input.addEventListener('input', function() {
-            calculate();
-            saveToStorage();
-        });
-
-        input.addEventListener('blur', function() {
-            this.type = 'text';
-            const dtype = this.getAttribute('data-type');
-            
-            if (dtype === 'pct') {
-                // パーセンテージ入力欄の処理
-                let num = parseInt(this.value, 10);
-                if (isNaN(num) || num <= 0) {
-                    this.value = "";
-                } else {
-                    if (num > 100) num = 100;
-                    this.value = num;
+            input.addEventListener('input', function() {
+                const dtype = this.getAttribute('data-type');
+                if (dtype === 'tier') {
+                    const troopType = this.getAttribute('data-troop');
+                    updateTroopTotalFromTiers(troopType);
                 }
-            } else {
-                // 通常のカンマ区切り数値欄の処理
-                const isCountField = (this.id === 'shieldCount' || this.id === 'spearCount' || this.id === 'archerCount');
-                const minVal = isCountField ? 0 : 1;
-                const num = getNumericValue(this.id, minVal);
-                this.value = formatWithCommas(num);
-            }
-            saveToStorage();
+                calculate();
+                saveToStorage();
+            });
+
+            input.addEventListener('blur', function() {
+                this.type = 'text';
+                const dtype = this.getAttribute('data-type');
+                
+                if (dtype === 'pct') {
+                    let num = parseInt(this.value, 10);
+                    if (isNaN(num) || num <= 0) {
+                        this.value = "";
+                    } else {
+                        if (num > 100) num = 100;
+                        this.value = num;
+                    }
+                } else if (dtype === 'tier') {
+                    const num = getNumericValue(this.id, 0);
+                    this.value = (num === 0) ? "" : formatWithCommas(num);
+                } else {
+                    const isCountField = (this.id === 'shieldCount' || this.id === 'spearCount' || this.id === 'archerCount');
+                    const minVal = isCountField ? 0 : 1;
+                    const num = getNumericValue(this.id, minVal);
+                    this.value = formatWithCommas(num);
+                }
+                saveToStorage();
+            });
         });
-    });
+    }
 
     ['joyShieldNum', 'joySpearNum', 'joyArcherNum', 
      'bearShieldNum', 'bearSpearNum', 'bearArcherNum',
      'bearRallyShieldNum', 'bearRallySpearNum', 'bearRallyArcherNum'].forEach(setupCopyElement);
 
     window.onload = function() {
+        initTierRows();
         loadFromStorage();
-        document.querySelectorAll('input[data-type="int"]').forEach(input => {
+        setupInputEvents();
+
+        document.querySelectorAll('input[data-type="int"], input[data-type="tier"]').forEach(input => {
             if(input.value.trim() !== "") {
                 const num = parseInt(input.value.replace(/,/g, ''), 10);
-                if(!isNaN(num)) input.value = num.toLocaleString();
+                if(!isNaN(num) && num > 0) input.value = num.toLocaleString();
             }
         });
         calculate();
