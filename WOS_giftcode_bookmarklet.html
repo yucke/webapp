@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>WOS ギフトコード自動入力ツール</title>
+  <style>
+    :root {
+      --primary-color: #007aff;
+      --success-color: #34c759;
+      --bg-color: #f2f2f7;
+      --card-bg: #ffffff;
+      --text-main: #1c1c1e;
+      --text-sub: #8e8e93;
+      --border-color: #e5e5ea;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", Arial, sans-serif;
+      background-color: var(--bg-color);
+      color: var(--text-main);
+      padding: 24px 16px;
+      line-height: 1.5;
+    }
+
+    .container {
+      max-width: 440px;
+      margin: 0 auto;
+    }
+
+    .header {
+      text-align: center;
+      margin-bottom: 24px;
+    }
+
+    .header h1 {
+      font-size: 1.4rem;
+      font-weight: 700;
+      color: #000;
+    }
+
+    .header p {
+      font-size: 0.85rem;
+      color: var(--text-sub);
+      margin-top: 4px;
+    }
+
+    .card {
+      background: var(--card-bg);
+      border-radius: 16px;
+      padding: 20px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+      margin-bottom: 20px;
+    }
+
+    .form-group {
+      margin-bottom: 16px;
+    }
+
+    label {
+      display: block;
+      font-size: 0.85rem;
+      font-weight: 600;
+      margin-bottom: 6px;
+      color: #3a3a3c;
+    }
+
+    input[type="text"] {
+      width: 100%;
+      padding: 12px 14px;
+      font-size: 1rem;
+      border: 1px solid var(--border-color);
+      border-radius: 10px;
+      background-color: #f9f9f9;
+      outline: none;
+      transition: border-color 0.2s, background-color 0.2s;
+    }
+
+    input[type="text"]:focus {
+      border-color: var(--primary-color);
+      background-color: #fff;
+    }
+
+    .btn {
+      display: block;
+      width: 100%;
+      padding: 14px;
+      font-size: 1rem;
+      font-weight: 600;
+      text-align: center;
+      border: none;
+      border-radius: 12px;
+      cursor: pointer;
+      transition: opacity 0.2s, transform 0.1s;
+    }
+
+    .btn:active {
+      transform: scale(0.98);
+    }
+
+    .btn-primary {
+      background-color: var(--primary-color);
+      color: #ffffff;
+      margin-top: 20px;
+    }
+
+    .btn-success {
+      background-color: var(--success-color);
+      color: #ffffff;
+    }
+
+    #resultArea {
+      display: none;
+      margin-top: 24px;
+      animation: fadeIn 0.3s ease-in-out;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(8px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .instructions {
+      background: #f8f8fa;
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      padding: 16px;
+      margin-top: 16px;
+      font-size: 0.85rem;
+    }
+
+    .instructions h3 {
+      font-size: 0.9rem;
+      margin-bottom: 8px;
+      color: #000;
+    }
+
+    .instructions ol {
+      padding-left: 18px;
+      color: #48484a;
+    }
+
+    .instructions li {
+      margin-bottom: 8px;
+    }
+
+    .footer {
+      text-align: center;
+      font-size: 0.75rem;
+      color: var(--text-sub);
+      margin-top: 20px;
+    }
+  </style>
+</head>
+<body>
+
+<div class="container">
+  <div class="header">
+    <h1>WOS ギフトコード自動入力</h1>
+    <p>Safari用 ブックマークレット生成ツール</p>
+  </div>
+
+  <div class="card">
+    <div class="form-group">
+      <label for="playerId">プレイヤーID (FID) <span style="color:red">*</span></label>
+      <input type="text" id="playerId" placeholder="例: 12345678" pattern="[0-9]*" inputmode="numeric">
+    </div>
+
+    <div class="form-group">
+      <label for="stateId">王国番号 (State ID) <span style="color:#8e8e93; font-weight:normal;">(任意)</span></label>
+      <input type="text" id="stateId" placeholder="例: 100" pattern="[0-9]*" inputmode="numeric">
+    </div>
+
+    <button class="btn btn-primary" onclick="generateCode()">専用コードを生成する</button>
+  </div>
+
+  <div id="resultArea" class="card">
+    <button id="copyBtn" class="btn btn-success" onclick="copyToClipboard()">コードをコピーする</button>
+
+    <div class="instructions">
+      <h3>【Safariでの登録・使用手順】</h3>
+      <ol>
+        <li>上の<strong>「コードをコピーする」</strong>をタップします。</li>
+        <li>Safari下部の共有アイコン（<strong>[↑]</strong>）を押し、<strong>「ブックマークに追加」</strong>でこのページを登録します。</li>
+        <li>ブックマーク一覧を開き、右下の<strong>「編集」</strong>から追加したブックマークを選択します。</li>
+        <li>アドレス（URL）欄の内容を消去し、<strong>コピーしたコードを貼り付けて保存</strong>します。</li>
+        <li>ギフトコードをコピーした状態でWOS入力ページを開き、作成したブックマークをタップすると自動セットされます。</li>
+      </ol>
+    </div>
+  </div>
+
+  <div class="footer">
+    Whiteout Survival Giftcode Helper
+  </div>
+</div>
+
+<script>
+let generatedScript = "";
+
+function generateCode() {
+  const pid = document.getElementById('playerId').value.trim();
+  const sid = document.getElementById('stateId').value.trim();
+
+  if (!pid) {
+    alert('プレイヤーIDを入力してください');
+    return;
+  }
+
+  // 完全版ブックマークレットスクリプト
+  generatedScript = `javascript:(async function(){
+    const targetPID = "${pid}";
+    const targetSID = "${sid}";
+
+    function setNativeValue(element, value) {
+      if (!element || value === undefined || value === null) return;
+      const valueSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set;
+      valueSetter.call(element, value);
+      element.dispatchEvent(new Event('input', { bubbles: true }));
+      element.dispatchEvent(new Event('change', { bubbles: true }));
+    }
+
+    let giftCode = "";
+    try {
+      if (navigator.clipboard && navigator.clipboard.readText) {
+        giftCode = await navigator.clipboard.readText();
+      }
+    } catch (e) {
+      console.log('Clipboard read error:', e);
+    }
+
+    if (!giftCode || giftCode.includes('\\n')) {
+      const promptVal = prompt('ギフトコードを入力（または貼り付け）してください:', giftCode ? giftCode.trim() : '');
+      if (promptVal !== null) {
+        giftCode = promptVal;
+      }
+    }
+
+    giftCode = giftCode ? giftCode.trim() : "";
+
+    const inputs = Array.from(document.querySelectorAll('input'));
+
+    if (inputs.length === 0) {
+      alert('入力欄が見つかりませんでした。');
+      return;
+    }
+
+    if (inputs[0]) setNativeValue(inputs[0], targetPID);
+
+    if (inputs.length === 2) {
+      if (giftCode) setNativeValue(inputs[1], giftCode);
+    } else if (inputs.length >= 3) {
+      if (targetSID && inputs[1]) setNativeValue(inputs[1], targetSID);
+      if (giftCode && inputs[2]) setNativeValue(inputs[2], giftCode);
+    }
+  })();`;
+
+  document.getElementById('resultArea').style.display = 'block';
+  document.getElementById('copyBtn').innerText = "コードをコピーする";
+  document.getElementById('resultArea').scrollIntoView({ behavior: 'smooth' });
+}
+
+function copyToClipboard() {
+  if (!generatedScript) return;
+  
+  navigator.clipboard.writeText(generatedScript).then(() => {
+    const btn = document.getElementById('copyBtn');
+    btn.innerText = "✓ コピーしました！";
+    setTimeout(() => { btn.innerText = "コードをコピーする"; }, 2000);
+  }).catch(err => {
+    // 互換性フォールバック（旧ブラウザ対策）
+    const textArea = document.createElement("textarea");
+    textArea.value = generatedScript;
+    document.body.appendChild(textArea);
+    textArea.select();
+    try {
+      document.execCommand('copy');
+      const btn = document.getElementById('copyBtn');
+      btn.innerText = "✓ コピーしました！";
+      setTimeout(() => { btn.innerText = "コードをコピーする"; }, 2000);
+    } catch (err2) {
+      alert('コピーに失敗しました。');
+    }
+    document.body.removeChild(textArea);
+  });
+}
+</script>
+
+</body>
+</html>
