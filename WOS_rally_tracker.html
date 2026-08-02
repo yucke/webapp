@@ -1117,13 +1117,13 @@
             }
 
             const tzLabel = tzMode === 'utc' ? 'UTC' : '現地';
-            let text = `【同時着弾スケジュール】 (${tzLabel})
+            let text = `【着弾スケジュール】 (${tzLabel})
 `;
 
             rallies.forEach(r => {
                 const launchStr = formatTime(new Date(r.launchTimeMs));
                 const arrivalStr = formatTime(new Date(r.arrivalTimeMs));
-                text += `・${r.leaderName} : ${r.rallyMin}分集結 | 発起 ${launchStr} / 着弾 ${arrivalStr}
+                text += `・${r.leaderName} : ${r.rallyMin}分 | ${arrivalStr}
 `;
             });
 
