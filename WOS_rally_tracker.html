@@ -473,6 +473,42 @@
         }
 
         .toast.show { opacity: 1; }
+/* Wheel picker styles */
+.wheel-picker { display:flex; gap:6px; align-items:center; }
+.wheel {
+  width: 64px;
+  height: 120px; /* 3 items visible (40px each) */
+  overflow-y: scroll;
+  -webkit-overflow-scrolling: touch;
+  scroll-snap-type: y mandatory;
+  border: 1px solid var(--panel-border);
+  border-radius: 6px;
+  background: var(--input-bg);
+  position: relative;
+}
+.wheel .item {
+  height: 40px;
+  line-height:40px;
+  text-align:center;
+  font-family:monospace;
+  font-weight:bold;
+  color:var(--text-main);
+  scroll-snap-align: center;
+  user-select:none;
+}
+.wheel-mask {
+  pointer-events: none;
+  position: absolute;
+  left:0; right:0; top:0; bottom:0;
+  display:flex; align-items:center; justify-content:center;
+}
+.wheel-center {
+  width:100%; height:40px; border-top:1px solid rgba(255,255,255,0.06); border-bottom:1px solid rgba(255,255,255,0.06);
+  background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.00));
+  box-sizing:border-box;
+}
+.wheel::-webkit-scrollbar { width: 0; height: 0; }
+.wheel.selected .item { color: var(--accent-yellow); }
     </style>
 </head>
 <body>
