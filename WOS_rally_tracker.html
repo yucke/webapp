@@ -626,7 +626,7 @@
 
     <script>
         // --- データ状態 ---
-        let tzMode = localStorage.getItem('rally_v7_tz') || 'local'; // 'local' or 'utc'
+        let tzMode = localStorage.getItem('rally_v7_tz') || 'utc'; // 'local' or 'utc'
         let leaders = JSON.parse(localStorage.getItem('rally_v7_leaders')) || [
             { id: 'l1', name: 'プレイヤーA', marchSec: 90, calcMode: 'launch' },
             { id: 'l2', name: 'プレイヤーB', marchSec: 135, calcMode: 'arrival' }
