@@ -213,6 +213,30 @@
             font-weight: bold;
         }
 
+        .calendar-btn {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            background-color: #4285f4;
+            color: white;
+            border: none;
+            width: 30px;
+            height: 30px;
+            font-size: 16px;
+            font-weight: bold;
+            border-radius: 50%;
+            padding: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 10;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .calendar-btn:active {
+            opacity: 0.8;
+        }
+
         .delete-btn {
             position: absolute;
             top: 10px;
@@ -512,6 +536,22 @@
             });
         }
 
+        function addToGoogleCalendar(taskName, deadlineStr, event) {
+            event.stopPropagation();
+            
+            const deadlineDate = new Date(deadlineStr);
+            
+            // Googleカレンダーの形式に合わせて時刻を整形
+            // 形式: 20230101T120000/20230101T130000
+            const startTime = deadlineDate.toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
+            const endTime = new Date(deadlineDate.getTime() + 60 * 60 * 1000).toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
+            
+            const calendarUrl = `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(taskName)}&dates=${startTime}/${endTime}`;
+            
+            window.open(calendarUrl, '_blank');
+            showToast(`📅 Googleカレンダーを開いています...`);
+        }
+
         function copy24hTasks() {
             const now = new Date();
             
@@ -631,6 +671,7 @@
                     </div>
                     <div class="task-time-info">期限: ${textDeadline}</div>
                     <div class="task-countdown">${countdownText}</div>
+                    <button class="calendar-btn" onclick="addToGoogleCalendar('${escapeHtml(task.name).replace(/'/g, "\\'")}', '${task.deadline}', event)" title="Googleカレンダーに追加">📅</button>
                     <button class="edit-btn" 
                             onclick="startEdit(${task.id}, event)" 
                             ${isCurrentlyEditing ? 'disabled' : ''}>
