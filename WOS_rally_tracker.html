@@ -1168,7 +1168,7 @@
                             <div class="timer-val">${formatTime(new Date(r.arrivalTimeMs))}</div>
                         </div>
                         <div class="timer-box self-launch">
-                            <span class="timer-label">🪖 自分 発起</span>
+                            <span class="timer-label">🚀 差込　出発</span>
                             <div class="timer-val">${formatTime(new Date(r.arrivalTimeMs - myMarchSec * 1000))}</div>
                         </div>
                         <div class="timer-box">
@@ -1221,7 +1221,7 @@
                 const launchTime = formatTime(new Date(r.launchTimeMs));
                 const arrivalTime = formatTime(new Date(r.arrivalTimeMs));
                 const myLaunchTime = formatTime(new Date(r.arrivalTimeMs - myMarchSec * 1000));
-                return `${r.leaderName}: ${launchTime}→${arrivalTime} (🪖自分: ${myLaunchTime})`;
+                return `${r.leaderName}: ${launchTime}→${arrivalTime} (�差込: ${myLaunchTime})`;
             }).join('\n');
 
             navigator.clipboard.writeText(lines).then(() => {
