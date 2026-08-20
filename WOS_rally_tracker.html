@@ -357,6 +357,7 @@
 
         .timer-box.launch .timer-val { color: var(--accent-yellow); }
         .timer-box.arrival .timer-val { color: var(--accent-green); }
+        .timer-box.self-launch .timer-val { color: var(--accent-purple); }
 
         .empty-state {
             text-align: center;
@@ -473,6 +474,46 @@
         }
 
         .toast.show { opacity: 1; }
+
+        /* my-march-time パネルのスタイル */
+        .my-march-panel {
+            background-color: rgba(168, 85, 247, 0.1);
+            border: 1px dashed var(--accent-purple);
+            border-radius: 8px;
+            padding: 12px;
+            margin-bottom: 16px;
+        }
+
+        .my-march-panel .panel-title {
+            font-size: 0.9rem;
+            color: var(--accent-purple);
+            font-weight: bold;
+            margin-bottom: 8px;
+        }
+
+        .my-march-panel .time-display {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .my-march-panel .time-display input {
+            width: 60px;
+            text-align: center;
+            padding: 6px;
+            background-color: var(--input-bg);
+            border: 1px solid var(--panel-border);
+            border-radius: 4px;
+            color: var(--text-main);
+            font-family: monospace;
+        }
+
+        .my-march-panel .btn-save {
+            padding: 6px 12px;
+            font-size: 0.8rem;
+            background-color: var(--accent-purple);
+            color: #f8fafc;
+        }
 /* Wheel picker styles */
 .wheel-picker { display:flex; gap:6px; align-items:center; }
 .wheel {
@@ -532,6 +573,16 @@
     <div class="grid-layout">
         <!-- 左側: リーダー追加（折りたたみ式） -->
         <div>
+            <!-- 自分の行軍時間 -->
+            <div class="my-march-panel">
+                <div class="panel-title">🪖 自分の行軍時間</div>
+                <div class="time-display">
+                    <input type="number" id="myMarchMin" min="0" max="59" value="1" placeholder="分"> 分
+                    <input type="number" id="myMarchSec" min="0" max="59" value="30" placeholder="秒"> 秒
+                    <button class="btn-save" onclick="saveMyMarchTime()">保存</button>
+                </div>
+            </div>
+
             <div class="panel">
                 <div class="accordion-header" onclick="toggleAccordion()">
                     <span>👤 新しいリーダーを追加</span>
@@ -627,6 +678,7 @@
     <script>
         // --- データ状態 ---
         let tzMode = localStorage.getItem('rally_v7_tz') || 'utc'; // 'local' or 'utc'
+        let myMarchSec = parseInt(localStorage.getItem('rally_v7_my_march')) || 90; // 自分の行軍時間（秒）
         let leaders = JSON.parse(localStorage.getItem('rally_v7_leaders')) || [
             { id: 'l1', name: 'プレイヤーA', marchSec: 90, calcMode: 'launch' },
             { id: 'l2', name: 'プレイヤーB', marchSec: 135, calcMode: 'arrival' }
@@ -641,10 +693,27 @@
         document.addEventListener('DOMContentLoaded', () => {
             updateTzUI();
             loadTargetTime();
+            loadMyMarchTime();
             renderLeaders();
             renderRallies();
             setInterval(updateLoop, 200); // 5Hz高精度更新
         });
+
+        // --- 自分の行軍時間の管理 ---
+        function loadMyMarchTime() {
+            const min = Math.floor(myMarchSec / 60);
+            const sec = myMarchSec % 60;
+            document.getElementById('myMarchMin').value = min;
+            document.getElementById('myMarchSec').value = sec;
+        }
+
+        function saveMyMarchTime() {
+            const min = parseInt(document.getElementById('myMarchMin').value) || 0;
+            const sec = parseInt(document.getElementById('myMarchSec').value) || 0;
+            myMarchSec = min * 60 + sec;
+            localStorage.setItem('rally_v7_my_march', String(myMarchSec));
+            renderRallies(); // 自分の発起時刻が変わるのでリストを再レンダリング
+        }
 
         // --- 折りたたみ制御 ---
         function toggleAccordion() {
@@ -1005,13 +1074,11 @@
                     arrivalMs = launchMs + (totalRequiredSec * 1000);
                 }
 
-                rallies = rallies.map(r => r.id === editingRallyId ? {
-                    ...r,
-                    rallyMin: selectedRallyMin,
-                    launchTimeMs: launchMs,
-                    arrivalTimeMs: arrivalMs
-                } : r);
+                rally.rallyMin = selectedRallyMin;
+                rally.launchTimeMs = launchMs;
+                rally.arrivalTimeMs = arrivalMs;
             } else {
+                // 新規追加モード
                 if (isLaunchMode) {
                     arrivalMs = getTargetTimestampMs();
                     launchMs = arrivalMs - (totalRequiredSec * 1000);
@@ -1019,47 +1086,43 @@
                     const h = parseInt(document.getElementById('modalLaunchH').value) || 0;
                     const m = parseInt(document.getElementById('modalLaunchM').value) || 0;
                     const s = parseInt(document.getElementById('modalLaunchS').value) || 0;
-                    const baseDate = new Date();
 
+                    const baseDate = new Date();
                     if (tzMode === 'utc') {
-                        launchMs = new Date(Date.UTC(baseDate.getUTCFullYear(), baseDate.getUTCMonth(), baseDate.getUTCDate(), h, m, s)).getTime();
+                        const lDate = new Date(Date.UTC(baseDate.getUTCFullYear(), baseDate.getUTCMonth(), baseDate.getUTCDate(), h, m, s));
+                        launchMs = lDate.getTime();
                     } else {
-                        launchMs = new Date(baseDate.getFullYear(), baseDate.getMonth(), baseDate.getDate(), h, m, s).getTime();
+                        const lDate = new Date(baseDate.getFullYear(), baseDate.getMonth(), baseDate.getDate(), h, m, s);
+                        launchMs = lDate.getTime();
                     }
                     arrivalMs = launchMs + (totalRequiredSec * 1000);
                 }
 
-                // 新規セット時は常に新規追加
                 rallies.push({
-                    id: 'r_' + Date.now() + '_' + Math.random().toString(36).substr(2, 4),
-                    leaderId: leader.id,
+                    id: 'r_' + Date.now(),
+                    leaderId: selectedLeaderId,
                     leaderName: leader.name,
-                    rallyMin: selectedRallyMin,
+                    calcMode: leader.calcMode,
                     marchSec: leader.marchSec,
-                    launchTimeMs: launchMs,
-                    arrivalTimeMs: arrivalMs,
-                    calcMode: leader.calcMode
+                    rallyMin: selectedRallyMin,
+                    launchTimeMs,
+                    arrivalTimeMs
                 });
             }
 
-            rallies.sort((a, b) => a.arrivalTimeMs - b.arrivalTimeMs);
-            saveAndRenderRallies();
             closeModal();
-        }
-
-        // --- スケジュール描画 & 自動削除 ---
-        function saveAndRenderRallies() {
-            localStorage.setItem('rally_v7_schedules', JSON.stringify(rallies));
             renderRallies();
+            localStorage.setItem('rally_v7_schedules', JSON.stringify(rallies));
         }
 
-        function deleteRally(id) {
-            rallies = rallies.filter(r => r.id !== id);
-            saveAndRenderRallies();
-        }
-
+        // --- 進行中の行軍レンダリング＆更新ループ ---
         function renderRallies() {
             const container = document.getElementById('rallyListContainer');
+            const now = Date.now();
+
+            // 過去の行軍を除外
+            rallies = rallies.filter(r => r.arrivalTimeMs > now - 60000);
+
             if (rallies.length === 0) {
                 container.innerHTML = '<div class="empty-state">実行中の集結はありません</div>';
                 return;
@@ -1068,120 +1131,103 @@
             container.innerHTML = '';
             rallies.forEach(r => {
                 const card = document.createElement('div');
-                card.id = `rally-card-${r.id}`;
                 card.className = 'rally-card';
 
-                const launchStr = formatTime(new Date(r.launchTimeMs));
-                const arrivalStr = formatTime(new Date(r.arrivalTimeMs));
-                const marchMin = Math.floor(r.marchSec / 60);
-                const marchSec = r.marchSec % 60;
+                const launchDiff = r.launchTimeMs - now;
+                const arrivalDiff = r.arrivalTimeMs - now;
+                const myLaunchDiff = (r.arrivalTimeMs - myMarchSec * 1000) - now;
+
+                // 状態判定（相手の行軍開始/着弾）
+                let cardStatus = '';
+                if (launchDiff <= 0 && arrivalDiff > 0) {
+                    card.classList.add('launched');
+                    cardStatus = '進行中';
+                } else if (launchDiff > 0) {
+                    if (launchDiff < 60000) { // 1分以内は urgent
+                        card.classList.add('urgent');
+                    }
+                    cardStatus = '待機中';
+                } else {
+                    cardStatus = '完了';
+                }
 
                 card.innerHTML = `
                     <div class="rally-info">
-                        <div>
-                            <strong style="color:var(--text-main); font-size:1rem;">👤 ${escapeHtml(r.leaderName)}</strong>
-                            <span style="margin-left:6px;">集結:${r.rallyMin}分 / 行軍:${marchMin}分${String(marchSec).padStart(2, '0')}秒</span>
-                        </div>
-                        <div class="rally-actions">
-                            <button class="btn-secondary" onclick="openModalForEdit('${r.id}')">集結時間変更</button>
-                            <button class="btn-danger" onclick="deleteRally('${r.id}')">取消</button>
-                        </div>
+                        <span>👤 ${escapeHtml(r.leaderName)}</span>
+                        <span>${cardStatus}</span>
+                        <button class="btn-secondary" onclick="openModalForEdit('${r.id}')">✏️</button>
+                        <button class="btn-danger" onclick="deleteRally('${r.id}')">削除</button>
                     </div>
                     <div class="rally-times-display">
                         <div class="timer-box launch">
-                            <span class="timer-label">集結発起 (${launchStr})</span>
-                            <div class="timer-val" id="cd-launch-${r.id}">--:--:--</div>
+                            <span class="timer-label">相手 発起</span>
+                            <div class="timer-val">${formatTime(new Date(r.launchTimeMs))}</div>
                         </div>
                         <div class="timer-box arrival">
-                            <span class="timer-label">目標着弾 (${arrivalStr})</span>
-                            <div class="timer-val" id="cd-arrival-${r.id}">--:--:--</div>
+                            <span class="timer-label">相手 着弾</span>
+                            <div class="timer-val">${formatTime(new Date(r.arrivalTimeMs))}</div>
+                        </div>
+                        <div class="timer-box self-launch">
+                            <span class="timer-label">🪖 自分 発起</span>
+                            <div class="timer-val">${formatTime(new Date(r.arrivalTimeMs - myMarchSec * 1000))}</div>
+                        </div>
+                        <div class="timer-box">
+                            <span class="timer-label">発起まで</span>
+                            <div class="timer-val" id="cd-${r.id}">${formatCountdown(myLaunchDiff)}</div>
                         </div>
                     </div>
                 `;
+
                 container.appendChild(card);
             });
         }
 
-        function updateLoop() {
-            const now = Date.now();
-            document.getElementById('systemClock').textContent = formatTime(new Date(now));
-
-            if (selectedLeaderId) updateModalPreview();
-
-            let hasDeleted = false;
-
-            rallies.forEach(r => {
-                const card = document.getElementById(`rally-card-${r.id}`);
-                const launchCdEl = document.getElementById(`cd-launch-${r.id}`);
-                const arrivalCdEl = document.getElementById(`cd-arrival-${r.id}`);
-
-                if (!card || !launchCdEl || !arrivalCdEl) return;
-
-                const launchDiff = r.launchTimeMs - now;
-                const arrivalDiff = r.arrivalTimeMs - now;
-
-                if (arrivalDiff <= 0) {
-                    rallies = rallies.filter(item => item.id !== r.id);
-                    hasDeleted = true;
-                    return;
-                }
-
-                card.classList.remove('urgent', 'launched');
-
-                if (launchDiff <= 0) {
-                    card.classList.add('launched');
-                    launchCdEl.textContent = '発起済';
-                    arrivalCdEl.textContent = formatCountdown(arrivalDiff);
-                } else {
-                    launchCdEl.textContent = formatCountdown(launchDiff);
-                    arrivalCdEl.textContent = formatCountdown(arrivalDiff);
-
-                    if (launchDiff <= 10000) {
-                        card.classList.add('urgent');
-                    }
-                }
-            });
-
-            if (hasDeleted) saveAndRenderRallies();
+        function deleteRally(id) {
+            rallies = rallies.filter(r => r.id !== id);
+            renderRallies();
+            localStorage.setItem('rally_v7_schedules', JSON.stringify(rallies));
         }
 
-        // --- クリップボードコピー ---
+        // --- メインループ（タイマーアップデート） ---
+        function updateLoop() {
+            // システムクロック更新
+            document.getElementById('systemClock').textContent = formatTime(new Date());
+
+            // カウントダウン更新
+            const now = Date.now();
+            rallies.forEach(r => {
+                const el = document.getElementById(`cd-${r.id}`);
+                if (el) {
+                    const myLaunchDiff = (r.arrivalTimeMs - myMarchSec * 1000) - now;
+                    el.textContent = formatCountdown(myLaunchDiff);
+                }
+            });
+        }
+
+        // --- ユーティリティ ---
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
         function copyScheduleToClipboard() {
             if (rallies.length === 0) {
-                alert('コピーする行軍情報がありません。');
+                alert('集結がありません');
                 return;
             }
 
-            const tzLabel = tzMode === 'utc' ? 'UTC' : '現地';
-            let text = `【着弾スケジュール】 (${tzLabel})
-`;
+            const lines = rallies.map(r => {
+                const launchTime = formatTime(new Date(r.launchTimeMs));
+                const arrivalTime = formatTime(new Date(r.arrivalTimeMs));
+                const myLaunchTime = formatTime(new Date(r.arrivalTimeMs - myMarchSec * 1000));
+                return `${r.leaderName}: ${launchTime}→${arrivalTime} (🪖自分: ${myLaunchTime})`;
+            }).join('\n');
 
-            rallies.forEach(r => {
-                const launchStr = formatTime(new Date(r.launchTimeMs));
-                const arrivalStr = formatTime(new Date(r.arrivalTimeMs));
-                text += `・${r.leaderName} : ${r.rallyMin}分 | ${arrivalStr}
-`;
-            });
-
-            navigator.clipboard.writeText(text).then(() => {
-                showToast('クリップボードにコピーしました！');
-            }).catch(() => {
-                alert('コピーに失敗しました。');
-            });
-        }
-
-        function showToast(msg) {
-            const toast = document.getElementById('toast');
-            toast.textContent = msg;
-            toast.classList.add('show');
-            setTimeout(() => toast.classList.remove('show'), 2000);
-        }
-
-        function escapeHtml(str) {
-            return str.replace(/[&<>"']/g, function(m) {
-                return {
-                    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;'
-                }[m];
+            navigator.clipboard.writeText(lines).then(() => {
+                const toast = document.getElementById('toast');
+                toast.classList.add('show');
+                setTimeout(() => toast.classList.remove('show'), 2000);
             });
         }
     </script>
