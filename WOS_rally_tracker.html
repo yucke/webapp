@@ -717,13 +717,50 @@
         }
 
         // --- 目標時刻の保存・復元 ---
+        // 2 padding items at top → scrollTop = (value + 1) * 40 for each value
         function getWheelValue(wheelEl) {
-            const scrollTop = wheelEl.scrollTop;
-            return Math.round(scrollTop / 40);
+            return Math.max(0, Math.round(wheelEl.scrollTop / 40) - 1);
         }
 
         function scrollWheelTo(wheelEl, value) {
-            wheelEl.scrollTop = value * 40;
+            wheelEl.scrollTop = (value + 1) * 40;
+        }
+
+        function buildWheelItems(wheelEl, max, initVal) {
+            [...wheelEl.querySelectorAll('.item')].forEach(el => el.remove());
+            const mask = wheelEl.querySelector('.wheel-mask');
+            // Insert 2 top padding items before mask (so first real value can be centered)
+            const padTop1 = document.createElement('div');
+            padTop1.className = 'item';
+            wheelEl.insertBefore(padTop1, mask);
+            const padTop2 = document.createElement('div');
+            padTop2.className = 'item';
+            wheelEl.insertBefore(padTop2, mask);
+            for (let i = 0; i <= max; i++) {
+                const item = document.createElement('div');
+                item.className = 'item';
+                item.textContent = String(i).padStart(2, '0');
+                wheelEl.insertBefore(item, mask);
+            }
+            for (let p = 0; p < 2; p++) {
+                const pad = document.createElement('div');
+                pad.className = 'item';
+                wheelEl.appendChild(pad);
+            }
+            scrollWheelTo(wheelEl, initVal);
+
+            // Remove any previous scroll listener before adding a new one
+            if (wheelEl._scrollAbort) wheelEl._scrollAbort.abort();
+            const ac = new AbortController();
+            wheelEl._scrollAbort = ac;
+            let scrollTimer = null;
+            wheelEl.addEventListener('scroll', () => {
+                clearTimeout(scrollTimer);
+                scrollTimer = setTimeout(() => {
+                    scrollWheelTo(wheelEl, getWheelValue(wheelEl));
+                    saveTargetTime();
+                }, 150);
+            }, { signal: ac.signal });
         }
 
         function initializeWheels() {
@@ -746,56 +783,15 @@
                 initS = 0;
             }
 
-            function buildWheel(wheelEl, max, initVal) {
-                // Remove existing items (keep mask)
-                [...wheelEl.querySelectorAll('.item')].forEach(el => el.remove());
-                // Padding items for centering
-                const padTop = document.createElement('div');
-                padTop.className = 'item';
-                wheelEl.insertBefore(padTop, wheelEl.firstChild);
-                const padTop2 = document.createElement('div');
-                padTop2.className = 'item';
-                wheelEl.insertBefore(padTop2, wheelEl.children[1]);
-                for (let i = 0; i <= max; i++) {
-                    const item = document.createElement('div');
-                    item.className = 'item';
-                    item.textContent = String(i).padStart(2, '0');
-                    const mask = wheelEl.querySelector('.wheel-mask');
-                    wheelEl.insertBefore(item, mask);
-                }
-                const padBot = document.createElement('div');
-                padBot.className = 'item';
-                wheelEl.appendChild(padBot);
-                const padBot2 = document.createElement('div');
-                padBot2.className = 'item';
-                wheelEl.appendChild(padBot2);
-                // Scroll to saved value (offset by 2 pad items)
-                wheelEl.scrollTop = initVal * 40;
-
-                let scrollTimer = null;
-                wheelEl.addEventListener('scroll', () => {
-                    clearTimeout(scrollTimer);
-                    scrollTimer = setTimeout(() => {
-                        const val = Math.round(wheelEl.scrollTop / 40);
-                        wheelEl.scrollTop = val * 40;
-                        saveTargetTime();
-                    }, 150);
-                });
-            }
-
-            buildWheel(document.getElementById('wheelHour'), 23, initH);
-            buildWheel(document.getElementById('wheelMin'), 59, initM);
-            buildWheel(document.getElementById('wheelSec'), 59, initS);
-        }
-
-        function loadTargetTime() {
-            // kept for compatibility; wheels are initialized via initializeWheels()
+            buildWheelItems(document.getElementById('wheelHour'), 23, initH);
+            buildWheelItems(document.getElementById('wheelMin'), 59, initM);
+            buildWheelItems(document.getElementById('wheelSec'), 59, initS);
         }
 
         function saveTargetTime() {
-            const h = Math.round(document.getElementById('wheelHour').scrollTop / 40);
-            const m = Math.round(document.getElementById('wheelMin').scrollTop / 40);
-            const s = Math.round(document.getElementById('wheelSec').scrollTop / 40);
+            const h = getWheelValue(document.getElementById('wheelHour'));
+            const m = getWheelValue(document.getElementById('wheelMin'));
+            const s = getWheelValue(document.getElementById('wheelSec'));
             localStorage.setItem('rally_v7_target_time', JSON.stringify({ h, m, s }));
             if (selectedLeaderId) updateModalPreview();
         }
@@ -827,9 +823,9 @@
         }
 
         function getTargetTimestampMs() {
-            const h = Math.round(document.getElementById('wheelHour').scrollTop / 40);
-            const m = Math.round(document.getElementById('wheelMin').scrollTop / 40);
-            const s = Math.round(document.getElementById('wheelSec').scrollTop / 40);
+            const h = getWheelValue(document.getElementById('wheelHour'));
+            const m = getWheelValue(document.getElementById('wheelMin'));
+            const s = getWheelValue(document.getElementById('wheelSec'));
 
             const now = new Date();
             let target;
