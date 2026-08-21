@@ -1144,6 +1144,7 @@
 
         function updateLoop() {
             const now = Date.now();
+            const myMarchMs = getMyMarchSec() * 1000;
             document.getElementById('systemClock').textContent = formatTime(new Date(now));
 
             if (selectedLeaderId) updateModalPreview();
@@ -1159,7 +1160,7 @@
                 if (!card || !launchCdEl || !myLaunchCdEl || !arrivalCdEl) return;
 
                 const launchDiff = r.launchTimeMs - now;
-                const myLaunchDiff = (r.arrivalTimeMs - (getMyMarchSec() * 1000)) - now;
+                const myLaunchDiff = (r.arrivalTimeMs - myMarchMs) - now;
                 const arrivalDiff = r.arrivalTimeMs - now;
 
                 if (arrivalDiff <= 0) {
