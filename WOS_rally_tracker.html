@@ -122,6 +122,9 @@
             .grid-layout {
                 grid-template-columns: 300px 1fr;
             }
+            .rally-times-display {
+                grid-template-columns: 1fr 1fr 1fr;
+            }
         }
 
         .panel {
@@ -332,26 +335,26 @@
         .rally-times-display {
             display: grid;
             grid-template-columns: 1fr 1fr;
-            gap: 8px;
+            gap: 6px;
             margin-top: 8px;
         }
 
         .timer-box {
             background-color: var(--input-bg);
-            padding: 8px;
+            padding: 5px 4px;
             border-radius: 4px;
             text-align: center;
         }
 
         .timer-label {
-            font-size: 0.7rem;
+            font-size: 0.62rem;
             color: var(--text-sub);
             display: block;
         }
 
         .timer-val {
             font-family: monospace;
-            font-size: 1.15rem;
+            font-size: 1rem;
             font-weight: bold;
         }
 
