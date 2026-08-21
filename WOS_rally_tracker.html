@@ -652,7 +652,7 @@
         // --- 初期化 ---
         document.addEventListener('DOMContentLoaded', () => {
             updateTzUI();
-            initializeWheels();
+            loadTargetTime();
             loadMyMarchTime();
             renderLeaders();
             renderRallies();
@@ -716,7 +716,7 @@
             return `${hStr}${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
         }
 
-        // --- 目標時刻の保存・復元 ---
+        // --- 目標時刻の初期化 ---
         // 2 padding items at top → scrollTop = (value + 1) * 40 for each value
         function getWheelValue(wheelEl) {
             return Math.max(0, Math.round(wheelEl.scrollTop / 40) - 1);
@@ -763,24 +763,17 @@
             }, { signal: ac.signal });
         }
 
-        function initializeWheels() {
-            const saved = JSON.parse(localStorage.getItem('rally_v7_target_time'));
+        function loadTargetTime() {
             const now = new Date();
             let initH, initM, initS;
-            if (saved) {
-                initH = parseInt(saved.h) || 0;
-                initM = parseInt(saved.m) || 0;
-                initS = parseInt(saved.s) || 0;
+            if (tzMode === 'utc') {
+                initH = now.getUTCHours();
+                initM = now.getUTCMinutes();
+                initS = now.getUTCSeconds();
             } else {
-                const future = new Date(now.getTime() + 10 * 60 * 1000);
-                if (tzMode === 'utc') {
-                    initH = future.getUTCHours();
-                    initM = future.getUTCMinutes();
-                } else {
-                    initH = future.getHours();
-                    initM = future.getMinutes();
-                }
-                initS = 0;
+                initH = now.getHours();
+                initM = now.getMinutes();
+                initS = now.getSeconds();
             }
 
             buildWheelItems(document.getElementById('wheelHour'), 23, initH);
@@ -789,10 +782,6 @@
         }
 
         function saveTargetTime() {
-            const h = getWheelValue(document.getElementById('wheelHour'));
-            const m = getWheelValue(document.getElementById('wheelMin'));
-            const s = getWheelValue(document.getElementById('wheelSec'));
-            localStorage.setItem('rally_v7_target_time', JSON.stringify({ h, m, s }));
             if (selectedLeaderId) updateModalPreview();
         }
 
