@@ -717,13 +717,15 @@
         }
 
         // --- 目標時刻の初期化 ---
-        // 2 padding items at top → scrollTop = (value + 1) * 40 for each value
+        const WHEEL_ITEM_HEIGHT = 40;
+        const WHEEL_TOP_PADDING_ITEMS = 2;
+
         function getWheelValue(wheelEl) {
-            return Math.max(0, Math.round(wheelEl.scrollTop / 40) - 1);
+            return Math.max(0, Math.round(wheelEl.scrollTop / WHEEL_ITEM_HEIGHT) - WHEEL_TOP_PADDING_ITEMS);
         }
 
         function scrollWheelTo(wheelEl, value) {
-            wheelEl.scrollTop = (value + 1) * 40;
+            wheelEl.scrollTop = (value + WHEEL_TOP_PADDING_ITEMS) * WHEEL_ITEM_HEIGHT;
         }
 
         function buildWheelItems(wheelEl, max, initVal) {
