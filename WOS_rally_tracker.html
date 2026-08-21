@@ -672,6 +672,7 @@
             tzMode = (tzMode === 'local') ? 'utc' : 'local';
             localStorage.setItem('rally_v7_tz', tzMode);
             updateTzUI();
+            loadTargetTime();
             renderLeaders();
             renderRallies();
             if (selectedLeaderId) updateModalPreview();
@@ -717,13 +718,13 @@
         }
 
         // --- 目標時刻の初期化 ---
-        // 2 padding items at top → scrollTop = (value + 1) * 40 for each value
+        // 2 padding items at top → scrollTop = (value + 2) * 40 for each value
         function getWheelValue(wheelEl) {
-            return Math.max(0, Math.round(wheelEl.scrollTop / 40) - 1);
+            return Math.max(0, Math.round(wheelEl.scrollTop / 40) - 2);
         }
 
         function scrollWheelTo(wheelEl, value) {
-            wheelEl.scrollTop = (value + 1) * 40;
+            wheelEl.scrollTop = (value + 2) * 40;
         }
 
         function buildWheelItems(wheelEl, max, initVal) {
