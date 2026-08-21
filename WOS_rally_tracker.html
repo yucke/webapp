@@ -528,6 +528,13 @@
         </div>
         <div class="clock-display" id="systemClock">00:00:00</div>
     </div>
+    <div class="target-bar">
+        <div class="target-title">🧍 自分の行軍時間</div>
+        <div class="target-time-input">
+            <input type="number" id="myMarchMin" min="0" max="59" value="1" placeholder="分" onchange="saveMyMarchTime()"> 分
+            <input type="number" id="myMarchSec" min="0" max="59" value="30" placeholder="秒" onchange="saveMyMarchTime()"> 秒
+        </div>
+    </div>
 
     <div class="grid-layout">
         <!-- 左側: リーダー追加（折りたたみ式） -->
@@ -641,6 +648,7 @@
         document.addEventListener('DOMContentLoaded', () => {
             updateTzUI();
             loadTargetTime();
+            loadMyMarchTime();
             renderLeaders();
             renderRallies();
             setInterval(updateLoop, 200); // 5Hz高精度更新
@@ -730,6 +738,32 @@
             const s = document.getElementById('targetSec').value;
             localStorage.setItem('rally_v7_target_time', JSON.stringify({ h, m, s }));
             if (selectedLeaderId) updateModalPreview();
+        }
+
+        function loadMyMarchTime() {
+            let saved = null;
+            try {
+                saved = JSON.parse(localStorage.getItem('rally_v7_my_march_time'));
+            } catch (_) {}
+            const min = Math.max(0, Math.min(59, parseInt(saved?.min) || 1));
+            const sec = Math.max(0, Math.min(59, parseInt(saved?.sec) || 30));
+            document.getElementById('myMarchMin').value = String(min);
+            document.getElementById('myMarchSec').value = String(sec).padStart(2, '0');
+        }
+
+        function saveMyMarchTime() {
+            const min = Math.max(0, Math.min(59, parseInt(document.getElementById('myMarchMin').value) || 0));
+            const sec = Math.max(0, Math.min(59, parseInt(document.getElementById('myMarchSec').value) || 0));
+            document.getElementById('myMarchMin').value = String(min);
+            document.getElementById('myMarchSec').value = String(sec).padStart(2, '0');
+            localStorage.setItem('rally_v7_my_march_time', JSON.stringify({ min, sec }));
+            renderRallies();
+        }
+
+        function getMyMarchSec() {
+            const min = parseInt(document.getElementById('myMarchMin').value) || 0;
+            const sec = parseInt(document.getElementById('myMarchSec').value) || 0;
+            return (min * 60) + sec;
         }
 
         function getTargetTimestampMs() {
@@ -1073,6 +1107,8 @@
 
                 const launchStr = formatTime(new Date(r.launchTimeMs));
                 const arrivalStr = formatTime(new Date(r.arrivalTimeMs));
+                const myDepartureTimeMs = r.arrivalTimeMs - (getMyMarchSec() * 1000);
+                const myDepartureStr = formatTime(new Date(myDepartureTimeMs));
                 const marchMin = Math.floor(r.marchSec / 60);
                 const marchSec = r.marchSec % 60;
 
@@ -1091,6 +1127,10 @@
                         <div class="timer-box launch">
                             <span class="timer-label">集結発起 (${launchStr})</span>
                             <div class="timer-val" id="cd-launch-${r.id}">--:--:--</div>
+                        </div>
+                        <div class="timer-box launch">
+                            <span class="timer-label">出発時刻 (${myDepartureStr})</span>
+                            <div class="timer-val" id="cd-my-launch-${r.id}">--:--:--</div>
                         </div>
                         <div class="timer-box arrival">
                             <span class="timer-label">目標着弾 (${arrivalStr})</span>
@@ -1113,11 +1153,13 @@
             rallies.forEach(r => {
                 const card = document.getElementById(`rally-card-${r.id}`);
                 const launchCdEl = document.getElementById(`cd-launch-${r.id}`);
+                const myLaunchCdEl = document.getElementById(`cd-my-launch-${r.id}`);
                 const arrivalCdEl = document.getElementById(`cd-arrival-${r.id}`);
 
-                if (!card || !launchCdEl || !arrivalCdEl) return;
+                if (!card || !launchCdEl || !myLaunchCdEl || !arrivalCdEl) return;
 
                 const launchDiff = r.launchTimeMs - now;
+                const myLaunchDiff = (r.arrivalTimeMs - (getMyMarchSec() * 1000)) - now;
                 const arrivalDiff = r.arrivalTimeMs - now;
 
                 if (arrivalDiff <= 0) {
@@ -1140,6 +1182,8 @@
                         card.classList.add('urgent');
                     }
                 }
+
+                myLaunchCdEl.textContent = myLaunchDiff <= 0 ? '発起済み' : formatCountdown(myLaunchDiff);
             });
 
             if (hasDeleted) saveAndRenderRallies();
