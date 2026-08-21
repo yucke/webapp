@@ -524,10 +524,12 @@
     <!-- 目標着弾時刻バー -->
     <div class="target-bar">
         <div class="target-title">🎯 目標着弾時刻 (<span class="tz-label">現地</span>)</div>
-        <div class="target-time-input">
-            <input type="number" id="targetHour" min="0" max="23" placeholder="時" onchange="saveTargetTime()"> 時
-            <input type="number" id="targetMin" min="0" max="59" placeholder="分" onchange="saveTargetTime()"> 分
-            <input type="number" id="targetSec" min="0" max="59" value="00" placeholder="秒" onchange="saveTargetTime()"> 秒
+        <div class="wheel-picker" id="targetTimePicker">
+            <div class="wheel" id="wheelHour"><div class="wheel-mask"><div class="wheel-center"></div></div></div>
+            <span>:</span>
+            <div class="wheel" id="wheelMin"><div class="wheel-mask"><div class="wheel-center"></div></div></div>
+            <span>:</span>
+            <div class="wheel" id="wheelSec"><div class="wheel-mask"><div class="wheel-center"></div></div></div>
         </div>
         <div class="clock-display" id="systemClock">00:00:00</div>
     </div>
@@ -650,7 +652,7 @@
         // --- 初期化 ---
         document.addEventListener('DOMContentLoaded', () => {
             updateTzUI();
-            loadTargetTime();
+            initializeWheels();
             loadMyMarchTime();
             renderLeaders();
             renderRallies();
@@ -715,30 +717,81 @@
         }
 
         // --- 目標時刻の保存・復元 ---
-        function loadTargetTime() {
+        // 2 padding items at top → scrollTop = (value + 1) * 40 for each value
+        function getWheelValue(wheelEl) {
+            return Math.max(0, Math.round(wheelEl.scrollTop / 40) - 1);
+        }
+
+        function scrollWheelTo(wheelEl, value) {
+            wheelEl.scrollTop = (value + 1) * 40;
+        }
+
+        function buildWheelItems(wheelEl, max, initVal) {
+            [...wheelEl.querySelectorAll('.item')].forEach(el => el.remove());
+            const mask = wheelEl.querySelector('.wheel-mask');
+            // Insert 2 top padding items before mask (so first real value can be centered)
+            const padTop1 = document.createElement('div');
+            padTop1.className = 'item';
+            wheelEl.insertBefore(padTop1, mask);
+            const padTop2 = document.createElement('div');
+            padTop2.className = 'item';
+            wheelEl.insertBefore(padTop2, mask);
+            for (let i = 0; i <= max; i++) {
+                const item = document.createElement('div');
+                item.className = 'item';
+                item.textContent = String(i).padStart(2, '0');
+                wheelEl.insertBefore(item, mask);
+            }
+            for (let p = 0; p < 2; p++) {
+                const pad = document.createElement('div');
+                pad.className = 'item';
+                wheelEl.appendChild(pad);
+            }
+            scrollWheelTo(wheelEl, initVal);
+
+            // Remove any previous scroll listener before adding a new one
+            if (wheelEl._scrollAbort) wheelEl._scrollAbort.abort();
+            const ac = new AbortController();
+            wheelEl._scrollAbort = ac;
+            let scrollTimer = null;
+            wheelEl.addEventListener('scroll', () => {
+                clearTimeout(scrollTimer);
+                scrollTimer = setTimeout(() => {
+                    scrollWheelTo(wheelEl, getWheelValue(wheelEl));
+                    saveTargetTime();
+                }, 150);
+            }, { signal: ac.signal });
+        }
+
+        function initializeWheels() {
             const saved = JSON.parse(localStorage.getItem('rally_v7_target_time'));
             const now = new Date();
+            let initH, initM, initS;
             if (saved) {
-                document.getElementById('targetHour').value = saved.h;
-                document.getElementById('targetMin').value = saved.m;
-                document.getElementById('targetSec').value = saved.s;
+                initH = parseInt(saved.h) || 0;
+                initM = parseInt(saved.m) || 0;
+                initS = parseInt(saved.s) || 0;
             } else {
                 const future = new Date(now.getTime() + 10 * 60 * 1000);
                 if (tzMode === 'utc') {
-                    document.getElementById('targetHour').value = String(future.getUTCHours()).padStart(2, '0');
-                    document.getElementById('targetMin').value = String(future.getUTCMinutes()).padStart(2, '0');
+                    initH = future.getUTCHours();
+                    initM = future.getUTCMinutes();
                 } else {
-                    document.getElementById('targetHour').value = String(future.getHours()).padStart(2, '0');
-                    document.getElementById('targetMin').value = String(future.getMinutes()).padStart(2, '0');
+                    initH = future.getHours();
+                    initM = future.getMinutes();
                 }
-                document.getElementById('targetSec').value = '00';
+                initS = 0;
             }
+
+            buildWheelItems(document.getElementById('wheelHour'), 23, initH);
+            buildWheelItems(document.getElementById('wheelMin'), 59, initM);
+            buildWheelItems(document.getElementById('wheelSec'), 59, initS);
         }
 
         function saveTargetTime() {
-            const h = document.getElementById('targetHour').value;
-            const m = document.getElementById('targetMin').value;
-            const s = document.getElementById('targetSec').value;
+            const h = getWheelValue(document.getElementById('wheelHour'));
+            const m = getWheelValue(document.getElementById('wheelMin'));
+            const s = getWheelValue(document.getElementById('wheelSec'));
             localStorage.setItem('rally_v7_target_time', JSON.stringify({ h, m, s }));
             if (selectedLeaderId) updateModalPreview();
         }
@@ -770,9 +823,9 @@
         }
 
         function getTargetTimestampMs() {
-            const h = parseInt(document.getElementById('targetHour').value) || 0;
-            const m = parseInt(document.getElementById('targetMin').value) || 0;
-            const s = parseInt(document.getElementById('targetSec').value) || 0;
+            const h = getWheelValue(document.getElementById('wheelHour'));
+            const m = getWheelValue(document.getElementById('wheelMin'));
+            const s = getWheelValue(document.getElementById('wheelSec'));
 
             const now = new Date();
             let target;
