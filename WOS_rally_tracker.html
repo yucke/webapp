@@ -1132,7 +1132,7 @@
                             <div class="timer-val" id="cd-launch-${r.id}">--:--:--</div>
                         </div>
                         <div class="timer-box launch">
-                            <span class="timer-label">出発時刻 (${myDepartureStr})</span>
+                            <span class="timer-label">差込出発 (${myDepartureStr})</span>
                             <div class="timer-val" id="cd-my-launch-${r.id}">--:--:--</div>
                         </div>
                         <div class="timer-box arrival">
@@ -1187,7 +1187,7 @@
                     }
                 }
 
-                myLaunchCdEl.textContent = myLaunchDiff <= 0 ? '発起済み' : formatCountdown(myLaunchDiff);
+                myLaunchCdEl.textContent = myLaunchDiff <= 0 ? '出発済' : formatCountdown(myLaunchDiff);
             });
 
             if (hasDeleted) saveAndRenderRallies();
