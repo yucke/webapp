@@ -899,7 +899,7 @@
 
         function createRallyEntry(leader, rallyMin, launchMs, arrivalMs) {
             rallies.push({
-                id: 'r_' + Date.now() + '_' + Math.random().toString(36).substr(2, 4),
+                id: 'r_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6),
                 leaderId: leader.id,
                 leaderName: leader.name,
                 rallyMin,
@@ -922,7 +922,7 @@
                 arrivalMs = getTargetTimestampMs();
                 launchMs = arrivalMs - (totalRequiredSec * 1000);
             } else {
-                launchMs = getCurrentLaunchTimestampMs();
+                launchMs = getCurrentTimeRoundedToSecondMs();
                 arrivalMs = launchMs + (totalRequiredSec * 1000);
             }
 
@@ -1000,12 +1000,8 @@
             ).getTime();
         }
 
-        function getCurrentLaunchTimestampMs() {
-            const now = new Date();
-            if (tzMode === 'utc') {
-                return buildTimestampForToday(now.getUTCHours(), now.getUTCMinutes(), now.getUTCSeconds(), now);
-            }
-            return buildTimestampForToday(now.getHours(), now.getMinutes(), now.getSeconds(), now);
+        function getCurrentTimeRoundedToSecondMs() {
+            return Math.floor(Date.now() / 1000) * 1000;
         }
 
         function setupModalView(leader, defaultMin, launchTimeMs, arrivalTimeMs) {
