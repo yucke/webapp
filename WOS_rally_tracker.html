@@ -648,6 +648,7 @@
         let editingRallyId = null; // 編集中の行軍ID（新規の場合はnull）
         let selectedLeaderId = null;
         let selectedRallyMin = 5;
+        let pendingLeaderTap = null;
 
         // --- 初期化 ---
         document.addEventListener('DOMContentLoaded', () => {
@@ -850,10 +851,7 @@
 
                 const card = document.createElement('div');
                 card.className = 'leader-card';
-                card.onclick = (e) => {
-                    if (e.target.tagName === 'BUTTON') return;
-                    openModalForNew(l.id);
-                };
+                card.addEventListener('click', (e) => handleLeaderCardTap(e, l.id));
 
                 card.innerHTML = `
                     <div class="leader-card-header">
@@ -871,6 +869,83 @@
             });
 
             localStorage.setItem('rally_v7_leaders', JSON.stringify(leaders));
+        }
+
+        function handleLeaderCardTap(event, leaderId) {
+            if (event.target.closest('button')) return;
+
+            if (pendingLeaderTap?.leaderId === leaderId) {
+                clearTimeout(pendingLeaderTap.timerId);
+                pendingLeaderTap = null;
+                addDefaultRallyForLeader(leaderId);
+                return;
+            }
+
+            if (pendingLeaderTap) {
+                clearTimeout(pendingLeaderTap.timerId);
+            }
+
+            pendingLeaderTap = {
+                leaderId,
+                timerId: setTimeout(() => {
+                    pendingLeaderTap = null;
+                    openModalForNew(leaderId);
+                }, 300)
+            };
+        }
+
+        function createRallyEntry(leader, rallyMin, launchMs, arrivalMs) {
+            rallies.push({
+                id: 'r_' + Date.now() + '_' + Math.random().toString(36).substr(2, 4),
+                leaderId: leader.id,
+                leaderName: leader.name,
+                rallyMin,
+                marchSec: leader.marchSec,
+                launchTimeMs: launchMs,
+                arrivalTimeMs: arrivalMs,
+                calcMode: leader.calcMode
+            });
+        }
+
+        function addDefaultRallyForLeader(leaderId) {
+            const leader = leaders.find(l => l.id === leaderId);
+            if (!leader) return;
+
+            const rallyMin = 5;
+            const totalRequiredSec = (rallyMin * 60) + leader.marchSec;
+            let launchMs, arrivalMs;
+
+            if (leader.calcMode === 'launch') {
+                arrivalMs = getTargetTimestampMs();
+                launchMs = arrivalMs - (totalRequiredSec * 1000);
+            } else {
+                const now = new Date();
+                if (tzMode === 'utc') {
+                    launchMs = new Date(Date.UTC(
+                        now.getUTCFullYear(),
+                        now.getUTCMonth(),
+                        now.getUTCDate(),
+                        now.getUTCHours(),
+                        now.getUTCMinutes(),
+                        now.getUTCSeconds()
+                    )).getTime();
+                } else {
+                    launchMs = new Date(
+                        now.getFullYear(),
+                        now.getMonth(),
+                        now.getDate(),
+                        now.getHours(),
+                        now.getMinutes(),
+                        now.getSeconds()
+                    ).getTime();
+                }
+                arrivalMs = launchMs + (totalRequiredSec * 1000);
+            }
+
+            createRallyEntry(leader, rallyMin, launchMs, arrivalMs);
+            rallies.sort((a, b) => a.arrivalTimeMs - b.arrivalTimeMs);
+            saveAndRenderRallies();
+            showToast(`${leader.name} を5分集結で追加しました`);
         }
 
         function addLeader() {
@@ -1109,17 +1184,7 @@
                     arrivalMs = launchMs + (totalRequiredSec * 1000);
                 }
 
-                // 新規セット時は常に新規追加
-                rallies.push({
-                    id: 'r_' + Date.now() + '_' + Math.random().toString(36).substr(2, 4),
-                    leaderId: leader.id,
-                    leaderName: leader.name,
-                    rallyMin: selectedRallyMin,
-                    marchSec: leader.marchSec,
-                    launchTimeMs: launchMs,
-                    arrivalTimeMs: arrivalMs,
-                    calcMode: leader.calcMode
-                });
+                createRallyEntry(leader, selectedRallyMin, launchMs, arrivalMs);
             }
 
             rallies.sort((a, b) => a.arrivalTimeMs - b.arrivalTimeMs);
