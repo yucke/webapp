@@ -647,8 +647,9 @@
         
         let editingRallyId = null; // 編集中の行軍ID（新規の場合はnull）
         let selectedLeaderId = null;
-        let selectedRallyMin = 5;
-        let pendingLeaderTap = null;
+        const DEFAULT_RALLY_MIN = 5;
+        let selectedRallyMin = DEFAULT_RALLY_MIN;
+        const pendingLeaderTapTimers = new Map();
         const WHEEL_ITEM_HEIGHT = 40;
         const WHEEL_TOP_PADDING_ITEMS = 2;
         const LEADER_DOUBLE_TAP_DELAY_MS = 300;
@@ -877,24 +878,18 @@
         function handleLeaderCardTap(event, leaderId) {
             if (event.target.closest('button')) return;
 
-            if (pendingLeaderTap?.leaderId === leaderId) {
-                clearTimeout(pendingLeaderTap.timerId);
-                pendingLeaderTap = null;
+            const pendingTimerId = pendingLeaderTapTimers.get(leaderId);
+            if (pendingTimerId) {
+                clearTimeout(pendingTimerId);
+                pendingLeaderTapTimers.delete(leaderId);
                 addDefaultRallyForLeader(leaderId);
                 return;
             }
 
-            if (pendingLeaderTap) {
-                clearTimeout(pendingLeaderTap.timerId);
-            }
-
-            pendingLeaderTap = {
-                leaderId,
-                timerId: setTimeout(() => {
-                    pendingLeaderTap = null;
-                    openModalForNew(leaderId);
-                }, LEADER_DOUBLE_TAP_DELAY_MS)
-            };
+            pendingLeaderTapTimers.set(leaderId, setTimeout(() => {
+                pendingLeaderTapTimers.delete(leaderId);
+                openModalForNew(leaderId);
+            }, LEADER_DOUBLE_TAP_DELAY_MS));
         }
 
         function createRallyEntry(leader, rallyMin, launchMs, arrivalMs) {
@@ -914,7 +909,7 @@
             const leader = leaders.find(l => l.id === leaderId);
             if (!leader) return;
 
-            const rallyMin = 5;
+            const rallyMin = DEFAULT_RALLY_MIN;
             const totalRequiredSec = (rallyMin * 60) + leader.marchSec;
             let launchMs, arrivalMs;
 
@@ -929,7 +924,7 @@
             createRallyEntry(leader, rallyMin, launchMs, arrivalMs);
             rallies.sort((a, b) => a.arrivalTimeMs - b.arrivalTimeMs);
             saveAndRenderRallies();
-            showToast(`${leader.name} を5分集結で追加しました`);
+            showToast(`${leader.name} を${rallyMin}分集結で追加しました`);
         }
 
         function addLeader() {
@@ -963,7 +958,7 @@
             if (!leader) return;
 
             document.getElementById('modalLeaderTitle').textContent = `⚔️ ${leader.name} の集結セット`;
-            setupModalView(leader, 5, Date.now(), null);
+            setupModalView(leader, DEFAULT_RALLY_MIN, Date.now(), null);
         }
 
         function openModalForEdit(rallyId) {
