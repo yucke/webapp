@@ -647,7 +647,12 @@
         
         let editingRallyId = null; // 編集中の行軍ID（新規の場合はnull）
         let selectedLeaderId = null;
-        let selectedRallyMin = 5;
+        const DEFAULT_RALLY_MIN = 5;
+        let selectedRallyMin = DEFAULT_RALLY_MIN;
+        const pendingLeaderTapTimers = new Map();
+        const WHEEL_ITEM_HEIGHT = 40;
+        const WHEEL_TOP_PADDING_ITEMS = 2;
+        const LEADER_DOUBLE_TAP_DELAY_MS = 300;
 
         // --- 初期化 ---
         document.addEventListener('DOMContentLoaded', () => {
@@ -672,6 +677,7 @@
             tzMode = (tzMode === 'local') ? 'utc' : 'local';
             localStorage.setItem('rally_v7_tz', tzMode);
             updateTzUI();
+            loadTargetTime();
             renderLeaders();
             renderRallies();
             if (selectedLeaderId) updateModalPreview();
@@ -717,9 +723,7 @@
         }
 
         // --- 目標時刻の初期化 ---
-        const WHEEL_ITEM_HEIGHT = 40;
-        const WHEEL_TOP_PADDING_ITEMS = 2;
-
+        // 2 padding items at top → scrollTop = (value + 2) * 40 for each value
         function getWheelValue(wheelEl) {
             return Math.max(0, Math.round(wheelEl.scrollTop / WHEEL_ITEM_HEIGHT) - WHEEL_TOP_PADDING_ITEMS);
         }
@@ -851,10 +855,7 @@
 
                 const card = document.createElement('div');
                 card.className = 'leader-card';
-                card.onclick = (e) => {
-                    if (e.target.tagName === 'BUTTON') return;
-                    openModalForNew(l.id);
-                };
+                card.addEventListener('click', (e) => handleLeaderCardTap(e, l.id));
 
                 card.innerHTML = `
                     <div class="leader-card-header">
@@ -872,6 +873,58 @@
             });
 
             localStorage.setItem('rally_v7_leaders', JSON.stringify(leaders));
+        }
+
+        function handleLeaderCardTap(event, leaderId) {
+            if (event.target.closest('button')) return;
+
+            const pendingTimerId = pendingLeaderTapTimers.get(leaderId);
+            if (pendingTimerId) {
+                clearTimeout(pendingTimerId);
+                pendingLeaderTapTimers.delete(leaderId);
+                addDefaultRallyForLeader(leaderId);
+                return;
+            }
+
+            pendingLeaderTapTimers.set(leaderId, setTimeout(() => {
+                pendingLeaderTapTimers.delete(leaderId);
+                openModalForNew(leaderId);
+            }, LEADER_DOUBLE_TAP_DELAY_MS));
+        }
+
+        function createRallyEntry(leader, rallyMin, launchMs, arrivalMs) {
+            rallies.push({
+                id: 'r_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6),
+                leaderId: leader.id,
+                leaderName: leader.name,
+                rallyMin,
+                marchSec: leader.marchSec,
+                launchTimeMs: launchMs,
+                arrivalTimeMs: arrivalMs,
+                calcMode: leader.calcMode
+            });
+        }
+
+        function addDefaultRallyForLeader(leaderId) {
+            const leader = leaders.find(l => l.id === leaderId);
+            if (!leader) return;
+
+            const rallyMin = DEFAULT_RALLY_MIN;
+            const totalRequiredSec = (rallyMin * 60) + leader.marchSec;
+            let launchMs, arrivalMs;
+
+            if (leader.calcMode === 'launch') {
+                arrivalMs = getTargetTimestampMs();
+                launchMs = arrivalMs - (totalRequiredSec * 1000);
+            } else {
+                launchMs = getCurrentTimeRoundedToSecondMs();
+                arrivalMs = launchMs + (totalRequiredSec * 1000);
+            }
+
+            createRallyEntry(leader, rallyMin, launchMs, arrivalMs);
+            rallies.sort((a, b) => a.arrivalTimeMs - b.arrivalTimeMs);
+            saveAndRenderRallies();
+            showToast(`${leader.name} を${rallyMin}分集結で追加しました`);
         }
 
         function addLeader() {
@@ -905,7 +958,7 @@
             if (!leader) return;
 
             document.getElementById('modalLeaderTitle').textContent = `⚔️ ${leader.name} の集結セット`;
-            setupModalView(leader, 5, Date.now(), null);
+            setupModalView(leader, DEFAULT_RALLY_MIN, Date.now(), null);
         }
 
         function openModalForEdit(rallyId) {
@@ -918,6 +971,32 @@
 
             document.getElementById('modalLeaderTitle').textContent = `✏️ ${rally.leaderName} の集結時間変更`;
             setupModalView(leader, rally.rallyMin, rally.launchTimeMs, rally.arrivalTimeMs);
+        }
+
+        function buildTimestampForToday(h, m, s, baseDate = new Date()) {
+            if (tzMode === 'utc') {
+                return new Date(Date.UTC(
+                    baseDate.getUTCFullYear(),
+                    baseDate.getUTCMonth(),
+                    baseDate.getUTCDate(),
+                    h,
+                    m,
+                    s
+                )).getTime();
+            }
+
+            return new Date(
+                baseDate.getFullYear(),
+                baseDate.getMonth(),
+                baseDate.getDate(),
+                h,
+                m,
+                s
+            ).getTime();
+        }
+
+        function getCurrentTimeRoundedToSecondMs() {
+            return Math.floor(Date.now() / 1000) * 1000;
         }
 
         function setupModalView(leader, defaultMin, launchTimeMs, arrivalTimeMs) {
@@ -1100,27 +1179,11 @@
                     const h = parseInt(document.getElementById('modalLaunchH').value) || 0;
                     const m = parseInt(document.getElementById('modalLaunchM').value) || 0;
                     const s = parseInt(document.getElementById('modalLaunchS').value) || 0;
-                    const baseDate = new Date();
-
-                    if (tzMode === 'utc') {
-                        launchMs = new Date(Date.UTC(baseDate.getUTCFullYear(), baseDate.getUTCMonth(), baseDate.getUTCDate(), h, m, s)).getTime();
-                    } else {
-                        launchMs = new Date(baseDate.getFullYear(), baseDate.getMonth(), baseDate.getDate(), h, m, s).getTime();
-                    }
+                    launchMs = buildTimestampForToday(h, m, s);
                     arrivalMs = launchMs + (totalRequiredSec * 1000);
                 }
 
-                // 新規セット時は常に新規追加
-                rallies.push({
-                    id: 'r_' + Date.now() + '_' + Math.random().toString(36).substr(2, 4),
-                    leaderId: leader.id,
-                    leaderName: leader.name,
-                    rallyMin: selectedRallyMin,
-                    marchSec: leader.marchSec,
-                    launchTimeMs: launchMs,
-                    arrivalTimeMs: arrivalMs,
-                    calcMode: leader.calcMode
-                });
+                createRallyEntry(leader, selectedRallyMin, launchMs, arrivalMs);
             }
 
             rallies.sort((a, b) => a.arrivalTimeMs - b.arrivalTimeMs);
