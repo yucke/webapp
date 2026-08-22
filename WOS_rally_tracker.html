@@ -649,6 +649,9 @@
         let selectedLeaderId = null;
         let selectedRallyMin = 5;
         let pendingLeaderTap = null;
+        const WHEEL_ITEM_HEIGHT = 40;
+        const WHEEL_TOP_PADDING_ITEMS = 2;
+        const LEADER_DOUBLE_TAP_DELAY_MS = 300;
 
         // --- 初期化 ---
         document.addEventListener('DOMContentLoaded', () => {
@@ -721,11 +724,11 @@
         // --- 目標時刻の初期化 ---
         // 2 padding items at top → scrollTop = (value + 2) * 40 for each value
         function getWheelValue(wheelEl) {
-            return Math.max(0, Math.round(wheelEl.scrollTop / 40) - 2);
+            return Math.max(0, Math.round(wheelEl.scrollTop / WHEEL_ITEM_HEIGHT) - WHEEL_TOP_PADDING_ITEMS);
         }
 
         function scrollWheelTo(wheelEl, value) {
-            wheelEl.scrollTop = (value + 2) * 40;
+            wheelEl.scrollTop = (value + WHEEL_TOP_PADDING_ITEMS) * WHEEL_ITEM_HEIGHT;
         }
 
         function buildWheelItems(wheelEl, max, initVal) {
@@ -890,7 +893,7 @@
                 timerId: setTimeout(() => {
                     pendingLeaderTap = null;
                     openModalForNew(leaderId);
-                }, 300)
+                }, LEADER_DOUBLE_TAP_DELAY_MS)
             };
         }
 
@@ -919,26 +922,7 @@
                 arrivalMs = getTargetTimestampMs();
                 launchMs = arrivalMs - (totalRequiredSec * 1000);
             } else {
-                const now = new Date();
-                if (tzMode === 'utc') {
-                    launchMs = new Date(Date.UTC(
-                        now.getUTCFullYear(),
-                        now.getUTCMonth(),
-                        now.getUTCDate(),
-                        now.getUTCHours(),
-                        now.getUTCMinutes(),
-                        now.getUTCSeconds()
-                    )).getTime();
-                } else {
-                    launchMs = new Date(
-                        now.getFullYear(),
-                        now.getMonth(),
-                        now.getDate(),
-                        now.getHours(),
-                        now.getMinutes(),
-                        now.getSeconds()
-                    ).getTime();
-                }
+                launchMs = getCurrentLaunchTimestampMs();
                 arrivalMs = launchMs + (totalRequiredSec * 1000);
             }
 
@@ -992,6 +976,36 @@
 
             document.getElementById('modalLeaderTitle').textContent = `✏️ ${rally.leaderName} の集結時間変更`;
             setupModalView(leader, rally.rallyMin, rally.launchTimeMs, rally.arrivalTimeMs);
+        }
+
+        function buildTimestampForToday(h, m, s, baseDate = new Date()) {
+            if (tzMode === 'utc') {
+                return new Date(Date.UTC(
+                    baseDate.getUTCFullYear(),
+                    baseDate.getUTCMonth(),
+                    baseDate.getUTCDate(),
+                    h,
+                    m,
+                    s
+                )).getTime();
+            }
+
+            return new Date(
+                baseDate.getFullYear(),
+                baseDate.getMonth(),
+                baseDate.getDate(),
+                h,
+                m,
+                s
+            ).getTime();
+        }
+
+        function getCurrentLaunchTimestampMs() {
+            const now = new Date();
+            if (tzMode === 'utc') {
+                return buildTimestampForToday(now.getUTCHours(), now.getUTCMinutes(), now.getUTCSeconds(), now);
+            }
+            return buildTimestampForToday(now.getHours(), now.getMinutes(), now.getSeconds(), now);
         }
 
         function setupModalView(leader, defaultMin, launchTimeMs, arrivalTimeMs) {
@@ -1174,13 +1188,7 @@
                     const h = parseInt(document.getElementById('modalLaunchH').value) || 0;
                     const m = parseInt(document.getElementById('modalLaunchM').value) || 0;
                     const s = parseInt(document.getElementById('modalLaunchS').value) || 0;
-                    const baseDate = new Date();
-
-                    if (tzMode === 'utc') {
-                        launchMs = new Date(Date.UTC(baseDate.getUTCFullYear(), baseDate.getUTCMonth(), baseDate.getUTCDate(), h, m, s)).getTime();
-                    } else {
-                        launchMs = new Date(baseDate.getFullYear(), baseDate.getMonth(), baseDate.getDate(), h, m, s).getTime();
-                    }
+                    launchMs = buildTimestampForToday(h, m, s);
                     arrivalMs = launchMs + (totalRequiredSec * 1000);
                 }
 
