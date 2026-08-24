@@ -603,7 +603,7 @@
         <div>
             <!-- リーダー一覧 -->
             <div class="panel">
-                <h2>👇 タップして集結をセット</h2>
+                <h2>👇 ダブルタップして集結をセット</h2>
                 <div id="leaderListContainer">
                     <div class="empty-state">リーダーが登録されていません</div>
                 </div>
@@ -666,8 +666,8 @@
             <p style="font-size:0.9rem; color:var(--text-main);">目標着弾時刻に合わせて、各リーダーの集結発起時刻や着弾時刻をすばやく確認できます。</p>
             <ul class="help-list">
                 <li>上部で「目標着弾時刻」と「自分の行軍時間」を設定します。</li>
-                <li>「新しいリーダーを追加」で名前・行軍時間・計算モードを登録します。</li>
-                <li>リーダーカードをタップすると集結時間を選べて、発起時刻または着弾時刻が自動計算されます。</li>
+                <li>「新しいリーダーを追加」でリーダーの名前・行軍時間・計算モードを登録します。</li>
+                <li>リーダーカードをタップすると集結時間を選べて、発起時刻または着弾時刻が自動計算されます。ダブルタップすると集結時間5分固定で行軍一覧に直接追加します。</li>
                 <li>「進行中の行軍一覧」で残り時間を確認し、必要に応じて時間変更やコピーができます。</li>
             </ul>
             <div class="modal-actions">
@@ -1058,8 +1058,8 @@
                     : '【集結時間変更】集結発起時刻を固定し、新しい目標着弾時刻を計算します。';
             } else {
                 document.getElementById('modalModeDesc').textContent = isLaunchMode 
-                    ? '【集結発起時刻計算】全体目標時間に合わせて発起時刻を計算します。'
-                    : '【着弾時刻計算】発起時刻に合わせて目標到着時間を計算します。';
+                    ? '【集結発起時刻計算】自分の同盟用に発起時刻を計算します。'
+                    : '【着弾時刻計算】敵の着弾時刻を計算します。';
             }
 
             const launchInputGroup = document.getElementById('launchTimeInputGroup');
@@ -1121,7 +1121,7 @@
                     arrivalMs = rally.arrivalTimeMs;
                     launchMs = arrivalMs - (totalRequiredSec * 1000);
 
-                    document.getElementById('previewLabel').textContent = `固定された目標着弾時刻 (${formatTime(new Date(arrivalMs))}) ➔ 新しい集結発起時刻`;
+                    document.getElementById('previewLabel').textContent = `目標着弾時刻（固定） (${formatTime(new Date(arrivalMs))}) ➔ 新しい集結発起時刻`;
                     document.getElementById('previewTimeVal').textContent = formatTime(new Date(launchMs));
 
                     const diffMs = launchMs - now;
@@ -1140,7 +1140,7 @@
                     launchMs = rally.launchTimeMs;
                     arrivalMs = launchMs + (totalRequiredSec * 1000);
 
-                    document.getElementById('previewLabel').textContent = `固定された発起時刻 (${formatTime(new Date(launchMs))}) ➔ 新しい目標着弾時刻`;
+                    document.getElementById('previewLabel').textContent = `発起時刻（固定） (${formatTime(new Date(launchMs))}) ➔ 新しい目標着弾時刻`;
                     document.getElementById('previewTimeVal').textContent = formatTime(new Date(arrivalMs));
 
                     const diffMs = arrivalMs - now;
@@ -1153,7 +1153,7 @@
                     arrivalMs = getTargetTimestampMs();
                     launchMs = arrivalMs - (totalRequiredSec * 1000);
 
-                    document.getElementById('previewLabel').textContent = '逆算された集結発起時刻';
+                    document.getElementById('previewLabel').textContent = '集結発起時刻';
                     document.getElementById('previewTimeVal').textContent = formatTime(new Date(launchMs));
 
                     const diffMs = launchMs - now;
@@ -1182,7 +1182,7 @@
                     }
                     arrivalMs = launchMs + (totalRequiredSec * 1000);
 
-                    document.getElementById('previewLabel').textContent = '算出された目標着弾時刻';
+                    document.getElementById('previewLabel').textContent = '着弾時刻';
                     document.getElementById('previewTimeVal').textContent = formatTime(new Date(arrivalMs));
 
                     const diffMs = arrivalMs - now;
