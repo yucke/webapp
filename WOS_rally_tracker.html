@@ -39,6 +39,8 @@
             display: flex;
             justify-content: space-between;
             align-items: center;
+            flex-wrap: wrap;
+            gap: 8px;
             margin-bottom: 16px;
             padding-bottom: 12px;
             border-bottom: 2px solid var(--panel-border);
@@ -48,6 +50,12 @@
             font-size: 1.2rem;
             color: var(--accent-blue);
             letter-spacing: 0.05em;
+        }
+
+        .header-title-group {
+            display: flex;
+            align-items: center;
+            gap: 8px;
         }
 
         .tz-toggle-btn {
@@ -64,6 +72,11 @@
 
         .tz-toggle-btn:hover {
             background-color: rgba(56, 189, 248, 0.15);
+        }
+
+        .help-btn {
+            padding: 4px 10px;
+            min-width: 36px;
         }
 
         /* ターゲット設定バー */
@@ -398,6 +411,16 @@
             margin-bottom: 8px;
         }
 
+        .help-list {
+            margin: 12px 0 0 18px;
+            color: var(--text-sub);
+            font-size: 0.9rem;
+        }
+
+        .help-list li + li {
+            margin-top: 8px;
+        }
+
         .radio-group-3 {
             display: grid;
             grid-template-columns: repeat(3, 1fr);
@@ -517,7 +540,10 @@
 <body>
 
     <header>
-        <h1>⚔️ 集結発起着弾タイマー</h1>
+        <div class="header-title-group">
+            <h1>⚔️ 集結発起着弾タイマー</h1>
+            <button class="tz-toggle-btn help-btn" onclick="openHelpModal()" aria-label="使い方を開く">？</button>
+        </div>
         <button class="tz-toggle-btn" id="tzToggleBtn" onclick="toggleTimeZone()">🌐 タイムゾーン: 現地時刻 (JST)</button>
     </header>
 
@@ -634,6 +660,22 @@
         </div>
     </div>
 
+    <div class="modal-overlay" id="helpModal">
+        <div class="modal">
+            <h3>使い方</h3>
+            <p style="font-size:0.9rem; color:var(--text-main);">目標着弾時刻に合わせて、各リーダーの集結発起時刻や着弾時刻をすばやく確認できます。</p>
+            <ul class="help-list">
+                <li>上部で「目標着弾時刻」と「自分の行軍時間」を設定します。</li>
+                <li>「新しいリーダーを追加」で名前・行軍時間・計算モードを登録します。</li>
+                <li>リーダーカードをタップすると集結時間を選べて、発起時刻または着弾時刻が自動計算されます。</li>
+                <li>「進行中の行軍一覧」で残り時間を確認し、必要に応じて時間変更やコピーができます。</li>
+            </ul>
+            <div class="modal-actions">
+                <button class="btn btn-cancel" onclick="closeHelpModal()">閉じる</button>
+            </div>
+        </div>
+    </div>
+
     <div class="toast" id="toast">コピーしました！</div>
 
     <script>
@@ -670,6 +712,14 @@
             const icon = document.getElementById('accordionIcon');
             content.classList.toggle('active');
             icon.textContent = content.classList.contains('active') ? '▲' : '▼';
+        }
+
+        function openHelpModal() {
+            document.getElementById('helpModal').classList.add('active');
+        }
+
+        function closeHelpModal() {
+            document.getElementById('helpModal').classList.remove('active');
         }
 
         // --- タイムゾーン切り替え ---
