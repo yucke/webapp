@@ -660,8 +660,8 @@
         </div>
     </div>
 
-    <div class="modal-overlay" id="helpModal">
-        <div class="modal">
+    <div class="modal-overlay" id="helpModal" onclick="closeHelpModal()">
+        <div class="modal" onclick="event.stopPropagation()">
             <h3>使い方</h3>
             <p style="font-size:0.9rem; color:var(--text-main);">目標着弾時刻に合わせて、各リーダーの集結発起時刻や着弾時刻をすばやく確認できます。</p>
             <ul class="help-list">
