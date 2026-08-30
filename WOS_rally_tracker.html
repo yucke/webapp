@@ -767,7 +767,7 @@
             document.getElementById('roomEndpoint').value = endpoint;
         }
 
-        async function toggleRoomConnection() {
+                async function toggleRoomConnection() {
             if (roomSocket) {
                 roomSocket.close();
                 return;
@@ -801,19 +801,27 @@
             localStorage.setItem('rally_v7_room_endpoint', endpoint);
             updateRoomStatus('接続中…');
             roomSocket = new WebSocket(url);
-            roomSocket.addEventListener('open', () => updateRoomStatus(`接続中: ${roomNumber}`, true));
             
-            // 30秒に1回 ping を送信して切断を防ぐ
-            pingInterval = setInterval(() => {
+            // ★ Ping送信タイマーの追加
+            roomSocket.addEventListener('open', () => {
+                updateRoomStatus(`接続中: ${roomNumber}`, true);
+                
+                pingInterval = setInterval(() => {
                     if (roomSocket && roomSocket.readyState === WebSocket.OPEN) {
                         roomSocket.send(JSON.stringify({ type: 'ping' }));
                     }
                 }, 30000); 
             });
+
             roomSocket.addEventListener('message', handleRoomMessage);
             roomSocket.addEventListener('error', () => updateRoomStatus('接続に失敗しました'));
-                        roomSocket.addEventListener('close', () => {
-                if (pingInterval) clearInterval(pingInterval); // タイマー停止
+            
+            // ★ Ping送信タイマーの解除
+            roomSocket.addEventListener('close', () => {
+                if (pingInterval) {
+                    clearInterval(pingInterval);
+                    pingInterval = null;
+                }
                 
                 roomSocket = null;
                 roomRole = null;
@@ -821,6 +829,7 @@
                 updateSharedControls();
             });
         }
+
 
         async function hashRoomPassphrase(passphrase) {
             const data = new TextEncoder().encode(passphrase);
