@@ -1,15 +1,57 @@
 const ROOM_ID_PATTERN = /^[a-f0-9]{64}$/;
 const EXPIRY_GRACE_MS = 5 * 60 * 1000;
 
-// HTML content will be injected by the build process
-const HTML_CONTENT = `{{HTML_PLACEHOLDER}}`;
+// Simple HTML served when no room parameter
+const HTML_CONTENT = `<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WOS Rally Tracker</title>
+</head>
+<body>
+    <div id="app">
+        <h1>WOS Rally Tracker</h1>
+        <div>
+            <label>ルーム番号:</label>
+            <input type="text" id="roomNumber" placeholder="ルーム番号を入力">
+        </div>
+        <div>
+            <label>Worker URL:</label>
+            <input type="text" id="roomEndpoint" placeholder="Worker URL" value="https://webapp.kiironoangel.workers.dev">
+        </div>
+        <button onclick="loadRoomSettings()">ルーム設定を読み込む</button>
+    </div>
+    <script>
+        function loadRoomSettings() {
+            const roomNumber = document.getElementById('roomNumber').value;
+            const endpoint = document.getElementById('roomEndpoint').value;
+            
+            if (!roomNumber) {
+                alert('ルーム番号を入力してください');
+                return;
+            }
+            
+            localStorage.setItem('rally_v7_room_number', roomNumber);
+            localStorage.setItem('rally_v7_room_endpoint', endpoint);
+            
+            // Connect to room
+            const url = new URL(endpoint);
+            url.searchParams.set('room', roomNumber);
+            const wsUrl = url.toString().replace(/^http/, 'ws');
+            
+            console.log('Connecting to:', wsUrl);
+        }
+    </script>
+</body>
+</html>`;
 
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
     const roomId = url.searchParams.get("room") || "";
 
-    // If no room parameter, return HTML (for direct access)
+    // If no room parameter, return HTML
     if (!roomId) {
       if (request.method !== "GET") {
         return new Response("Method Not Allowed", { status: 405 });
