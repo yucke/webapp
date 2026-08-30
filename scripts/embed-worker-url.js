@@ -109,7 +109,7 @@ async function embedWorkerUrlInHtml(workerUrl) {
   const placeholder = 'WORKER_URL_PLACEHOLDER';
   
   if (htmlContent.includes(placeholder)) {
-    htmlContent = htmlContent.split(placeholder).join(workerUrl);
+    htmlContent = htmlContent.replace(placeholder, workerUrl);
     console.log('✅ HTML を更新しました');
   } else {
     console.warn('⚠️ 置換対象が見つかりませんでした。手動で確認してください。');
