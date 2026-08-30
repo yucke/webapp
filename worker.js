@@ -1,5 +1,5 @@
 const ROOM_ID_PATTERN = /^[a-f0-9]{64}$/;
-const EXPIRY_GRACE_MS = 5 * 60 * 1000;
+const EXPIRY_GRACE_MS = 10 * 1000;
 
 // index.html を埋め込む
 const INDEX_HTML = `<!DOCTYPE html>
