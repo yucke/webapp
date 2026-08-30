@@ -1,48 +1,212 @@
 const ROOM_ID_PATTERN = /^[a-f0-9]{64}$/;
 const EXPIRY_GRACE_MS = 5 * 60 * 1000;
 
-// Simple HTML served when no room parameter
-const HTML_CONTENT = `<!DOCTYPE html>
+// index.html を読み込む（ビルド時に埋め込まれます）
+const INDEX_HTML = `<!DOCTYPE html>
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>WOS Rally Tracker</title>
+    <title>ホワサバ便利ツール保管庫</title>
+    <style>
+        /* ==========================================
+           全体の設定（極寒の世界観をイメージしたカラー）
+           ========================================== */
+        :root {
+            --bg-color: #0d1b2a;       /* 背景色：深いディープブルー */
+            --panel-bg: #1b263b;       /* カード背景：やや明るいネイビー */
+            --accent-color: #415a77;   /* 枠線など：くすんだブルー */
+            --text-color: #e0e1dd;     /* 基本文字：薄いグレー */
+            --ice-blue: #00b4d8;       /* アクセント：鮮やかなアイスブルー */
+            --ice-glow: #90e0ef;       /* 発光エフェクト用 */
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Helvetica Neue', Arial, 'Hiragino Kaku Gothic ProN', sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            line-height: 1.6;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        /* ==========================================
+           ヘッダーエリア
+           ========================================== */
+        header {
+            text-align: center;
+            padding: 50px 0 30px;
+            margin-bottom: 40px;
+        }
+
+        header h1 {
+            font-size: 2.3rem;
+            color: #ffffff;
+            text-shadow: 0 0 12px var(--ice-glow);
+            margin-bottom: 12px;
+            letter-spacing: 0.05em;
+        }
+
+        header p {
+            color: var(--ice-glow);
+            font-size: 1.05rem;
+            opacity: 0.9;
+        }
+
+        /* ==========================================
+           ツール一覧（自動レイアウト・グリッドレスポンス）
+           ========================================== */
+        .tools-grid {
+            display: grid;
+            /* 画面幅に合わせて、最小幅300pxのカードが自動で1列〜3列に並び替わります */
+            grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+            gap: 25px;
+        }
+
+        /* ツールカード（これをコピペして増やせます） */
+        .tool-card {
+            background-color: var(--panel-bg);
+            border: 1px solid var(--accent-color);
+            border-radius: 10px;
+            padding: 25px;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between; /* ボタンを下部に固定 */
+            transition: transform 0.2s, box-shadow 0.2s, border-color 0.2s;
+        }
+
+        /* マウスを乗せたときのアニメーション */
+        .tool-card:hover {
+            transform: translateY(-4px);
+            border-color: var(--ice-blue);
+            box-shadow: 0 8px 20px rgba(144, 224, 239, 0.15);
+        }
+
+        .tool-card-content h2 {
+            font-size: 1.35rem;
+            color: #ffffff;
+            margin-bottom: 12px;
+            line-height: 1.4;
+        }
+
+        .tool-card-content p {
+            font-size: 0.95rem;
+            color: #b0c4de;
+            margin-bottom: 25px;
+        }
+
+        /* ツールを開くボタン */
+        .btn {
+            display: block;
+            text-align: center;
+            background-color: var(--ice-blue);
+            color: var(--bg-color);
+            text-decoration: none;
+            padding: 10px 20px;
+            border-radius: 6px;
+            font-weight: bold;
+            font-size: 0.95rem;
+            transition: background-color 0.2s, color 0.2s;
+        }
+
+        .btn:hover {
+            background-color: var(--ice-glow);
+        }
+
+        /* ==========================================
+           フッター
+           ========================================== */
+        footer {
+            text-align: center;
+            padding: 60px 0 20px;
+            margin-top: 60px;
+            font-size: 0.85rem;
+            color: var(--accent-color);
+            border-top: 1px solid rgba(65, 90, 119, 0.3);
+        }
+    </style>
 </head>
 <body>
-    <div id="app">
-        <h1>WOS Rally Tracker</h1>
-        <div>
-            <label>ルーム番号:</label>
-            <input type="text" id="roomNumber" placeholder="ルーム番号を入力">
+
+<div class="container">
+    
+    <!-- ヘッダー -->
+    <header>
+        <h1>ホワサバ便利ツール保管庫</h1>
+        <p>ホワイトアウトサバイバル（Whiteout Survival）の攻略・効率化自作ツール集</p>
+    </header>
+
+    <!-- メインコンテンツ：ツール一覧 -->
+    <main class="tools-grid">
+        
+        <!-- 💡 ツールを増やしたい時は、ここから -->
+        <div class="tool-card">
+            <div class="tool-card-content">
+                <h2>王城着弾時刻 計算機</h2>
+                <p>指定した座標から城への集結着弾時刻を計算します。島の行軍アップ装飾はMAX、行軍ステ保有前提での計算です。時刻をタップすればクリップボードにコピーできます。</p>
+            </div>
+            <a href="WOS_sunfire_timer.html" class="btn" target="_blank" rel="noopener noreferrer">ツールを開く</a>
         </div>
-        <div>
-            <label>Worker URL:</label>
-            <input type="text" id="roomEndpoint" placeholder="Worker URL" value="https://webapp.kiironoangel.workers.dev">
+        <!-- ここまでをコピーして下に貼り付けるだけです 💡 -->
+
+        <div class="tool-card">
+            <div class="tool-card-content">
+                <h2>イベント早見表合成エディタ</h2>
+                <p>季節イベントなど、複数のイベントが重なるときに、1つの早見表に合成するエディタです。チャットで崩れずきれいに表示できます。</p>
+            </div>
+            <a href="WOS_task_maker.html" class="btn" target="_blank" rel="noopener noreferrer">ツールを開く</a>
         </div>
-        <button onclick="loadRoomSettings()">ルーム設定を読み込む</button>
-    </div>
-    <script>
-        function loadRoomSettings() {
-            const roomNumber = document.getElementById('roomNumber').value;
-            const endpoint = document.getElementById('roomEndpoint').value;
-            
-            if (!roomNumber) {
-                alert('ルーム番号を入力してください');
-                return;
-            }
-            
-            localStorage.setItem('rally_v7_room_number', roomNumber);
-            localStorage.setItem('rally_v7_room_endpoint', endpoint);
-            
-            // Connect to room
-            const url = new URL(endpoint);
-            url.searchParams.set('room', roomNumber);
-            const wsUrl = url.toString().replace(/^http/, 'ws');
-            
-            console.log('Connecting to:', wsUrl);
-        }
-    </script>
+
+        <div class="tool-card">
+            <div class="tool-card-content">
+                <h2>残り時間→日時変換タスクメモ</h2>
+                <p>ステ獲る方にはスケジュール表示されるのに守る方には表示されなくてわかりにくいよ｡ﾟ(ﾟ´ω\`ﾟ)ﾟ｡<br>
+                    そんな幹部の方に贈る！支配中ステーションの保護切れやエントリー締め切りなどの残り時間カウントダウン表示を具体的な日時に変換します。</p>
+            </div>
+            <a href="WOS_ToDo.html" class="btn" target="_blank" rel="noopener noreferrer">ツールを開く</a>
+        </div>
+        <div class="tool-card">
+            <div class="tool-card-content">
+                <h2>ジョイ弓残し計算機</h2>
+                <p>ジョイで援軍送るとき、弓だけ残すには盾槍何人送ればよい？と直前に慌てるあなたに贈る！手持ちの兵士数を兵種の優先度に従って計算します。</p>
+            </div>
+            <a href="WOS_troop_ratio_calc.html" class="btn" target="_blank" rel="noopener noreferrer">ツールを開く</a>
+        </div>
+        <div class="tool-card">
+            <div class="tool-card-content">
+                <h2>ギフコ入力補助ブックマークレット</h2>
+                <p>ギフココピって交換ページに行って、キャラクターIDコピるためにゲーム戻って…ってめんどくさいよね？交換ページでまとめて一気に入力できます。</p>
+            </div>
+            <a href="WOS_giftcode_bookmarklet.html" class="btn" target="_blank" rel="noopener noreferrer">ツールを開く</a>
+        </div>
+        <div class="tool-card">
+            <div class="tool-card-content">
+                <h2>集結着弾時刻管理</h2>
+                <p>同時進行の集結多すぎぃ！なタイムキーパー様に送る、事前に登録した集結主の行軍時間をもとに、発起時刻→着弾時刻、目標着弾時刻→発起時刻の変換ができます。</p>
+            </div>
+            <a href="WOS_rally_tracker.html" class="btn" target="_blank" rel="noopener noreferrer">ツールを開く</a>
+        </div>
+
+
+    </main>
+
+    <!-- フッター -->
+    <footer>
+        <p>本サイトは3560サーバのぷにゅが趣味で開発している非公式サイトです。</p>
+    </footer>
+
+</div>
+
 </body>
 </html>`;
 
@@ -51,12 +215,12 @@ export default {
     const url = new URL(request.url);
     const roomId = url.searchParams.get("room") || "";
 
-    // If no room parameter, return HTML
+    // If no room parameter, return index.html
     if (!roomId) {
       if (request.method !== "GET") {
         return new Response("Method Not Allowed", { status: 405 });
       }
-      return new Response(HTML_CONTENT, {
+      return new Response(INDEX_HTML, {
         headers: { "Content-Type": "text/html; charset=utf-8" },
       });
     }
