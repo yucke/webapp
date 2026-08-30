@@ -844,7 +844,7 @@
         function loadMyMarchTime() {
             let saved = null;
             try {
-                saved = JSON.parse(localStorage.getItem('rally_v7_my_march_time'));
+                saved = JSON.parse(localStorage.getItem('rally_tm_my_march_time'));
             } catch (_) {}
             const min = Math.max(0, Math.min(59, parseInt(saved?.min) || 1));
             const sec = Math.max(0, Math.min(59, parseInt(saved?.sec) || 30));
@@ -857,7 +857,7 @@
             const sec = Math.max(0, Math.min(59, parseInt(document.getElementById('myMarchSec').value) || 0));
             document.getElementById('myMarchMin').value = String(min);
             document.getElementById('myMarchSec').value = String(sec).padStart(2, '0');
-            localStorage.setItem('rally_v7_my_march_time', JSON.stringify({ min, sec }));
+            localStorage.setItem('rally_tm_my_march_time', JSON.stringify({ min, sec }));
             renderRallies();
         }
 
@@ -922,7 +922,7 @@
                 container.appendChild(card);
             });
 
-            localStorage.setItem('rally_v7_leaders', JSON.stringify(leaders));
+            localStorage.setItem('rally_tm_leaders', JSON.stringify(leaders));
         }
 
         function handleLeaderCardTap(event, leaderId) {
