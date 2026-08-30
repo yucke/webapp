@@ -596,20 +596,13 @@
             <input type="number" id="myMarchSec" min="0" max="59" value="30" placeholder="秒" onchange="saveMyMarchTime()"> 秒
         </div>
     </div>
-    <div class="target-bar room-bar">
-        <div class="target-title">👥 共有ルーム</div>
-        <div class="room-inputs">
-            <div class="form-group">
-                <label for="roomNumber">チーム共通の合言葉</label>
-                <input type="text" id="roomNumber" autocomplete="off" placeholder="親から伝えられた合言葉（4文字以上）">
-            </div>
-            <div class="form-group">
-                <label for="roomEndpoint">Worker URL</label>
-                <input type="text" id="roomEndpoint" autocomplete="url" placeholder="https://...workers.dev">
-            </div>
+<div class="target-bar room-bar" style="padding: 8px 12px; align-items: center;">
+        <div class="target-title" style="margin-right: 10px;">👥 共有ルーム</div>
+        <div style="display: flex; flex: 1; gap: 8px; align-items: center; min-width: 200px;">
+            <input type="text" id="roomNumber" autocomplete="off" placeholder="合言葉（4文字以上）" style="margin: 0; flex: 1;">
+            <button class="btn-secondary" id="roomConnectBtn" onclick="toggleRoomConnection()" style="white-space: nowrap; padding: 6px 16px;">接続</button>
         </div>
-        <button class="btn-secondary" id="roomConnectBtn" onclick="toggleRoomConnection()">接続</button>
-        <span class="room-status" id="roomStatus" role="status">未接続（端末内のみ）</span>
+        <span class="room-status" id="roomStatus" role="status" style="margin-left: auto;">未接続</span>
     </div>
 
     <div class="grid-layout">
@@ -758,54 +751,52 @@
             setInterval(updateLoop, 200); // 5Hz高精度更新
         });
 
+// ★追加：WorkerのURLを固定値として定義
+        const WORKER_ENDPOINT = 'https://webapp.kiironoangel.workers.dev/rally-room';
+
         // --- 共有ルーム ---
         function loadRoomSettings() {
             roomNumber = localStorage.getItem('rally_v7_room_number') || '';
-            const defaultEndpoint = location.protocol === 'file:' ? '' : `${location.origin}/rally-room`;
-            const endpoint = localStorage.getItem('rally_v7_room_endpoint') || defaultEndpoint;
             document.getElementById('roomNumber').value = roomNumber;
-            document.getElementById('roomEndpoint').value = endpoint;
+            // ※ Worker URLの読み込み・セット処理は削除
         }
 
-                async function toggleRoomConnection() {
+        async function toggleRoomConnection() {
             if (roomSocket) {
+                isIntentionalDisconnect = true; 
                 roomSocket.close();
                 return;
             }
 
             const nextRoom = document.getElementById('roomNumber').value.trim();
-            const endpoint = document.getElementById('roomEndpoint').value.trim();
             const roomLength = countPassphraseCharacters(nextRoom);
             if (roomLength < 4 || roomLength > 64) {
-                alert('合言葉は4〜64文字で入力してください。');
-                return;
-            }
-            if (!endpoint) {
-                alert('Worker URLを入力してください。');
+                alert('合言葉は絵文字を含めて4〜64文字で入力してください。');
                 return;
             }
 
             let url;
             try {
-                url = new URL(endpoint, location.href);
-                if (!['http:', 'https:', 'ws:', 'wss:'].includes(url.protocol)) throw new Error();
-                url.protocol = url.protocol === 'https:' ? 'wss:' : url.protocol === 'http:' ? 'ws:' : url.protocol;
+                // ★固定値の WORKER_ENDPOINT を使用する
+                url = new URL(WORKER_ENDPOINT);
+                url.protocol = url.protocol === 'https:' ? 'wss:' : 'ws:';
                 url.searchParams.set('room', await hashRoomPassphrase(nextRoom));
             } catch (_) {
-                alert('有効なWorker URLを入力してください。');
+                alert('URLの生成に失敗しました。');
                 return;
             }
 
+            isIntentionalDisconnect = false;
             roomNumber = nextRoom;
             localStorage.setItem('rally_v7_room_number', roomNumber);
-            localStorage.setItem('rally_v7_room_endpoint', endpoint);
+            
+            // ※ URLのローカルストレージ保存は削除
+            
             updateRoomStatus('接続中…');
             roomSocket = new WebSocket(url);
             
-            // ★ Ping送信タイマーの追加
             roomSocket.addEventListener('open', () => {
                 updateRoomStatus(`接続中: ${roomNumber}`, true);
-                
                 pingInterval = setInterval(() => {
                     if (roomSocket && roomSocket.readyState === WebSocket.OPEN) {
                         roomSocket.send(JSON.stringify({ type: 'ping' }));
@@ -814,19 +805,18 @@
             });
 
             roomSocket.addEventListener('message', handleRoomMessage);
-            roomSocket.addEventListener('error', () => updateRoomStatus('接続に失敗しました'));
+            roomSocket.addEventListener('error', () => updateRoomStatus('接続失敗'));
             
-            // ★ Ping送信タイマーの解除
             roomSocket.addEventListener('close', () => {
                 if (pingInterval) {
                     clearInterval(pingInterval);
                     pingInterval = null;
                 }
-                
                 roomSocket = null;
                 roomRole = null;
-                updateRoomStatus('未接続（端末内のみ）');
+                updateRoomStatus('未接続');
                 updateSharedControls();
+
             });
         }
 
