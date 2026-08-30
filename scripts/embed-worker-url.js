@@ -102,15 +102,14 @@ async function embedWorkerUrlInHtml(workerUrl) {
   
   let htmlContent = fs.readFileSync(htmlPath, 'utf-8');
 
-  // Replace the placeholder in loadRoomSettings function
-  // Before: const defaultEndpoint = location.protocol === 'file:' ? '' : `${location.origin}/rally-room`;
+  // Replace the WORKER_URL_PLACEHOLDER in loadRoomSettings function
+  // Before: const defaultEndpoint = 'WORKER_URL_PLACEHOLDER';
   // After: const defaultEndpoint = 'https://...workers.dev';
   
-  const oldPattern = /const defaultEndpoint = location\.protocol === 'file:' \? '' : `\$\{location\.origin\}\/rally-room`;
-  const newLine = `const defaultEndpoint = '${workerUrl}'`;
+  const placeholder = 'WORKER_URL_PLACEHOLDER';
   
-  if (oldPattern.test(htmlContent)) {
-    htmlContent = htmlContent.replace(oldPattern, newLine);
+  if (htmlContent.includes(placeholder)) {
+    htmlContent = htmlContent.split(placeholder).join(workerUrl);
     console.log('✅ HTML を更新しました');
   } else {
     console.warn('⚠️ 置換対象が見つかりませんでした。手動で確認してください。');
