@@ -217,7 +217,7 @@ export default {
 
     // 1. WebSocket接続のみをDurable Objectsへ転送（Upgradeヘッダー確認を追加）
     if (
-      pathname === "/WOS_rally_tracker.html" &&
+      pathname === "/rally-room" &&
       url.searchParams.has("room") &&
       request.headers.get("Upgrade")?.toLowerCase() === "websocket"
     ) {
