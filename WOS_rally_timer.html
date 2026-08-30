@@ -680,12 +680,12 @@
 
     <script>
         // --- データ状態 ---
-        let tzMode = localStorage.getItem('rally_v7_tz') || 'utc'; // 'local' or 'utc'
-        let leaders = JSON.parse(localStorage.getItem('rally_v7_leaders')) || [
+        let tzMode = localStorage.getItem('rally_tm_tz') || 'utc'; // 'local' or 'utc'
+        let leaders = JSON.parse(localStorage.getItem('rally_tm_leaders')) || [
             { id: 'l1', name: 'プレイヤーA', marchSec: 90, calcMode: 'launch' },
             { id: 'l2', name: 'プレイヤーB', marchSec: 135, calcMode: 'arrival' }
         ];
-        let rallies = JSON.parse(localStorage.getItem('rally_v7_schedules')) || [];
+        let rallies = JSON.parse(localStorage.getItem('rally_tm_schedules')) || [];
 
         let editingRallyId = null; // 編集中の行軍ID（新規の場合はnull）
         let selectedLeaderId = null;
@@ -725,7 +725,7 @@
         // --- タイムゾーン切り替え ---
         function toggleTimeZone() {
             tzMode = (tzMode === 'local') ? 'utc' : 'local';
-            localStorage.setItem('rally_v7_tz', tzMode);
+            localStorage.setItem('rally_tm_tz', tzMode);
             updateTzUI();
             loadTargetTime();
             renderLeaders();
