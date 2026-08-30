@@ -1,7 +1,9 @@
+import { getAssetFromKV } from '@cloudflare/kv-asset-handler';
+
 const ROOM_ID_PATTERN = /^[a-f0-9]{64}$/;
 const EXPIRY_GRACE_MS = 5 * 60 * 1000;
 
-// index.html を読み込む（ビルド時に埋め込まれます）
+// index.html を埋め込む
 const INDEX_HTML = `<!DOCTYPE html>
 <html lang="ja">
 <head>
@@ -213,35 +215,54 @@ const INDEX_HTML = `<!DOCTYPE html>
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
-    const roomId = url.searchParams.get("room") || "";
+    const pathname = url.pathname;
 
-    // If no room parameter, return index.html
-    if (!roomId) {
-      if (request.method !== "GET") {
-        return new Response("Method Not Allowed", { status: 405 });
-      }
-      return new Response(INDEX_HTML, {
-        headers: { "Content-Type": "text/html; charset=utf-8" },
-      });
+    // WOS_rally_tracker.html にアクセスした場合のみ WebSocket を処理
+    if (pathname === "/WOS_rally_tracker.html" && url.searchParams.has("room")) {
+      const roomId = url.searchParams.get("room");
+      return handleRallyRoom(request, env, roomId);
     }
 
-    // Otherwise, handle WebSocket connection for room
+    // その他すべてのリクエストは静的アセットを返す
     if (request.method !== "GET") {
       return new Response("Method Not Allowed", { status: 405 });
     }
 
-    if (!ROOM_ID_PATTERN.test(roomId)) {
-      return new Response("Invalid room ID", { status: 400 });
-    }
+    try {
+      // ルートパス（/）の場合は index.html を返す
+      if (pathname === "/" || pathname === "") {
+        return new Response(INDEX_HTML, {
+          headers: { "Content-Type": "text/html; charset=utf-8" },
+        });
+      }
 
-    if (request.headers.get("Upgrade") !== "websocket") {
-      return new Response("Expected WebSocket upgrade", { status: 426 });
+      // getAssetFromKV でアセットを取得
+      return await getAssetFromKV(request, {
+        ASSET_NAMESPACE: env.__STATIC_CONTENT,
+        ASSET_MANIFEST: JSON.parse(env.__STATIC_CONTENT_MANIFEST || "{}"),
+      });
+    } catch (error) {
+      // アセットが見つからない場合は index.html を返す
+      return new Response(INDEX_HTML, {
+        headers: { "Content-Type": "text/html; charset=utf-8" },
+        status: 404,
+      });
     }
-
-    const id = env.RALLY_ROOMS.idFromName(roomId);
-    return env.RALLY_ROOMS.get(id).fetch(request);
   },
 };
+
+async function handleRallyRoom(request, env, roomId) {
+  if (!ROOM_ID_PATTERN.test(roomId)) {
+    return new Response("Invalid room ID", { status: 400 });
+  }
+
+  if (request.headers.get("Upgrade") !== "websocket") {
+    return new Response("Expected WebSocket upgrade", { status: 426 });
+  }
+
+  const id = env.RALLY_ROOMS.idFromName(roomId);
+  return env.RALLY_ROOMS.get(id).fetch(request);
+}
 
 export class RallyRoom {
   constructor(state) {
