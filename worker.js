@@ -310,6 +310,9 @@ export class RallyRoom {
     } catch {
       return this.sendError(webSocket, "Invalid message");
     }
+    if (message.type === "ping") {
+      return; 
+    }
     if (webSocket !== this.ownerSocket) {
       return this.sendError(webSocket, "This room is view-only");
     }
