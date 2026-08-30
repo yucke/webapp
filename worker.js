@@ -96,17 +96,20 @@ export class RallyRoom {
     if (webSocket !== this.ownerSocket || this.isClosing) return;
 
     this.isClosing = true;
-    await this.state.storage.deleteAll();
-    for (const socket of this.sockets) {
-      try {
-        socket.send(JSON.stringify({ type: "room-closed" }));
-        socket.close(1000, "Room owner disconnected");
-      } catch {
-        this.sockets.delete(socket);
+    try {
+      await this.state.storage.deleteAll();
+      for (const socket of this.sockets) {
+        try {
+          socket.send(JSON.stringify({ type: "room-closed" }));
+          socket.close(1000, "Room owner disconnected");
+        } catch {
+          this.sockets.delete(socket);
+        }
       }
+      this.ownerSocket = null;
+    } finally {
+      this.isClosing = false;
     }
-    this.ownerSocket = null;
-    this.isClosing = false;
   }
 
   async getRoomState() {
