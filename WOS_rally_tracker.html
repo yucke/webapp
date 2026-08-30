@@ -119,6 +119,10 @@
             color: var(--accent-green);
         }
 
+        .room-status.viewer {
+            color: var(--accent-yellow);
+        }
+
         .target-bar .target-title {
             font-size: 0.9rem;
             color: var(--accent-blue);
@@ -596,8 +600,8 @@
         <div class="target-title">👥 共有ルーム</div>
         <div class="room-inputs">
             <div class="form-group">
-                <label for="roomNumber">チーム共通の部屋番号</label>
-                <input type="text" id="roomNumber" maxlength="64" autocomplete="off" placeholder="例: alliance-123">
+                <label for="roomNumber">チーム共通の合言葉</label>
+                <input type="text" id="roomNumber" maxlength="64" autocomplete="off" placeholder="親から伝えられた合言葉">
             </div>
             <div class="form-group">
                 <label for="roomEndpoint">Worker URL</label>
@@ -635,7 +639,7 @@
                             <option value="arrival">着弾時刻計算（発起時刻から計算）</option>
                         </select>
                     </div>
-                    <button class="btn" onclick="addLeader()">保存する</button>
+                    <button class="btn" data-shared-edit onclick="addLeader()">保存する</button>
                 </div>
             </div>
         </div>
@@ -729,6 +733,7 @@
         let rallies = JSON.parse(localStorage.getItem('rally_v7_schedules')) || [];
         let roomSocket = null;
         let roomNumber = '';
+        let roomRole = null;
         const ROOM_GRACE_MS = 5 * 60 * 1000;
         
         let editingRallyId = null; // 編集中の行軍ID（新規の場合はnull）
@@ -760,7 +765,7 @@
             document.getElementById('roomEndpoint').value = endpoint;
         }
 
-        function toggleRoomConnection() {
+        async function toggleRoomConnection() {
             if (roomSocket) {
                 roomSocket.close();
                 return;
@@ -768,8 +773,8 @@
 
             const nextRoom = document.getElementById('roomNumber').value.trim();
             const endpoint = document.getElementById('roomEndpoint').value.trim();
-            if (!/^[A-Za-z0-9_-]{1,64}$/.test(nextRoom)) {
-                alert('部屋番号は英数字・ハイフン・アンダースコアで64文字以内にしてください。');
+            if (!nextRoom || nextRoom.length > 64) {
+                alert('合言葉は1〜64文字で入力してください。');
                 return;
             }
             if (!endpoint) {
@@ -782,7 +787,7 @@
                 url = new URL(endpoint, location.href);
                 if (!['http:', 'https:', 'ws:', 'wss:'].includes(url.protocol)) throw new Error();
                 url.protocol = url.protocol === 'https:' ? 'wss:' : url.protocol === 'http:' ? 'ws:' : url.protocol;
-                url.searchParams.set('room', nextRoom);
+                url.searchParams.set('room', await hashRoomPassphrase(nextRoom));
             } catch (_) {
                 alert('有効なWorker URLを入力してください。');
                 return;
@@ -798,8 +803,16 @@
             roomSocket.addEventListener('error', () => updateRoomStatus('接続に失敗しました'));
             roomSocket.addEventListener('close', () => {
                 roomSocket = null;
+                roomRole = null;
                 updateRoomStatus('未接続（端末内のみ）');
+                updateSharedControls();
             });
+        }
+
+        async function hashRoomPassphrase(passphrase) {
+            const data = new TextEncoder().encode(passphrase);
+            const hash = await crypto.subtle.digest('SHA-256', data);
+            return [...new Uint8Array(hash)].map(byte => byte.toString(16).padStart(2, '0')).join('');
         }
 
         function handleRoomMessage(event) {
@@ -813,8 +826,14 @@
                 showToast(`共有エラー: ${message.message}`);
                 return;
             }
+            if (message.type === 'room-closed') {
+                showToast('親が切断したため共有ルームを閉じました。');
+                roomSocket?.close();
+                return;
+            }
             if (message.type !== 'state' || !Array.isArray(message.leaders) || !Array.isArray(message.rallies)) return;
 
+            roomRole = message.role;
             const localLeaders = leaders;
             const localRallies = rallies;
             leaders = message.leaders;
@@ -828,6 +847,7 @@
             if (selectedLeaderId && !leaders.some(leader => leader.id === selectedLeaderId)) closeModal();
             renderLeaders();
             renderRallies();
+            updateSharedControls();
         }
 
         function updateRoomStatus(message, connected = false) {
@@ -835,12 +855,30 @@
             const button = document.getElementById('roomConnectBtn');
             status.textContent = message;
             status.classList.toggle('connected', connected);
+            status.classList.toggle('viewer', roomSocket && roomRole === 'viewer');
             button.textContent = roomSocket ? '切断' : '接続';
         }
 
         function sendRoomEvent(message) {
             if (roomSocket?.readyState === WebSocket.OPEN) {
                 roomSocket.send(JSON.stringify(message));
+            }
+
+            function canEditSharedState() {
+                if (!roomSocket || roomRole === 'owner') return true;
+                showToast('子として接続中のため、共有データは変更できません。');
+                return false;
+            }
+
+            function updateSharedControls() {
+                const isViewer = roomSocket && roomRole === 'viewer';
+                document.querySelectorAll('[data-shared-edit]').forEach(element => {
+                    element.disabled = isViewer;
+                    element.title = isViewer ? '子として接続中のため変更できません' : '';
+                });
+                if (roomSocket && roomRole) {
+                    updateRoomStatus(roomRole === 'owner' ? `親として接続中: ${roomNumber}` : `子として参照中: ${roomNumber}`, true);
+                }
             }
         }
 
@@ -1054,7 +1092,7 @@
                             </span>
                             <div class="leader-meta">行軍時間: ${marchStr}</div>
                         </div>
-                        <button class="btn-danger" onclick="deleteLeader('${l.id}')">削除</button>
+                        <button class="btn-danger" data-shared-edit onclick="deleteLeader('${l.id}')">削除</button>
                     </div>
                 `;
                 container.appendChild(card);
@@ -1064,6 +1102,7 @@
 
         function handleLeaderCardTap(event, leaderId) {
             if (event.target.closest('button')) return;
+            if (!canEditSharedState()) return;
 
             const pendingTimerId = pendingLeaderTapTimers.get(leaderId);
             if (pendingTimerId) {
@@ -1095,6 +1134,7 @@
         }
 
         function addDefaultRallyForLeader(leaderId) {
+            if (!canEditSharedState()) return;
             const leader = leaders.find(l => l.id === leaderId);
             if (!leader) return;
 
@@ -1117,6 +1157,7 @@
         }
 
         function addLeader() {
+            if (!canEditSharedState()) return;
             const name = document.getElementById('newLeaderName').value.trim();
             const min = parseInt(document.getElementById('newMarchMin').value) || 0;
             const sec = parseInt(document.getElementById('newMarchSec').value) || 0;
@@ -1137,6 +1178,7 @@
         }
 
         function deleteLeader(id) {
+            if (!canEditSharedState()) return;
             leaders = leaders.filter(l => l.id !== id);
             localStorage.setItem('rally_v7_leaders', JSON.stringify(leaders));
             sendRoomEvent({ type: 'delete-leader', id });
@@ -1145,6 +1187,7 @@
 
         // --- モーダル制御 ---
         function openModalForNew(leaderId) {
+            if (!canEditSharedState()) return;
             editingRallyId = null;
             selectedLeaderId = leaderId;
             const leader = leaders.find(l => l.id === leaderId);
@@ -1155,6 +1198,7 @@
         }
 
         function openModalForEdit(rallyId) {
+            if (!canEditSharedState()) return;
             const rally = rallies.find(r => r.id === rallyId);
             if (!rally) return;
 
@@ -1336,6 +1380,7 @@
         }
 
         function confirmRallySchedule() {
+            if (!canEditSharedState()) return;
             if (!selectedLeaderId) return;
             const leader = leaders.find(l => l.id === selectedLeaderId);
             if (!leader) return;
@@ -1394,6 +1439,7 @@
         }
 
         function deleteRally(id) {
+            if (!canEditSharedState()) return;
             rallies = rallies.filter(r => r.id !== id);
             saveAndRenderRallies({ type: 'delete-rally', id });
         }
@@ -1425,8 +1471,8 @@
                             <span style="margin-left:6px;">集結:${r.rallyMin}分 / 行軍:${marchMin}分${String(marchSec).padStart(2, '0')}秒</span>
                         </div>
                         <div class="rally-actions">
-                            <button class="btn-secondary" onclick="openModalForEdit('${r.id}')">集結時間変更</button>
-                            <button class="btn-danger" onclick="deleteRally('${r.id}')">取消</button>
+                            <button class="btn-secondary" data-shared-edit onclick="openModalForEdit('${r.id}')">集結時間変更</button>
+                            <button class="btn-danger" data-shared-edit onclick="deleteRally('${r.id}')">取消</button>
                         </div>
                     </div>
                     <div class="rally-times-display">

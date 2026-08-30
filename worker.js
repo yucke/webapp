@@ -1,4 +1,4 @@
-const ROOM_NAME_PATTERN = /^[A-Za-z0-9_-]{1,64}$/;
+const ROOM_ID_PATTERN = /^[a-f0-9]{64}$/;
 const EXPIRY_GRACE_MS = 5 * 60 * 1000;
 
 export default {
@@ -8,15 +8,15 @@ export default {
     }
 
     const url = new URL(request.url);
-    const room = url.searchParams.get("room") || "";
-    if (!ROOM_NAME_PATTERN.test(room)) {
-      return new Response("Invalid room name", { status: 400 });
+    const roomId = url.searchParams.get("room") || "";
+    if (!ROOM_ID_PATTERN.test(roomId)) {
+      return new Response("Invalid room ID", { status: 400 });
     }
     if (request.headers.get("Upgrade") !== "websocket") {
       return new Response("Expected WebSocket upgrade", { status: 426 });
     }
 
-    const id = env.RALLY_ROOMS.idFromName(room);
+    const id = env.RALLY_ROOMS.idFromName(roomId);
     return env.RALLY_ROOMS.get(id).fetch(request);
   },
 };
@@ -25,20 +25,31 @@ export class RallyRoom {
   constructor(state) {
     this.state = state;
     this.sockets = new Set();
+    this.ownerSocket = null;
+    this.isClosing = false;
   }
 
   async fetch(request) {
     const pair = new WebSocketPair();
     const [client, server] = Object.values(pair);
+    const existingState = await this.state.storage.get("roomState");
+    const isNew = !existingState;
+    if (isNew) {
+      await this.state.storage.put("roomState", { leaders: [], rallies: [] });
+    }
     server.accept();
     this.sockets.add(server);
+    if (isNew) this.ownerSocket = server;
     server.addEventListener("message", (event) => this.handleMessage(server, event));
-    server.addEventListener("close", () => this.sockets.delete(server));
+    server.addEventListener("close", () => this.handleClose(server));
 
-    const isNew = !(await this.state.storage.get("roomState"));
     await this.cleanupExpiredRallies();
-    this.sendState(server, await this.getRoomState(), isNew);
+    this.sendState(server, await this.getRoomState(), isNew, isNew ? "owner" : "viewer");
     return new Response(null, { status: 101, webSocket: client });
+  }
+
+  if (webSocket !== this.ownerSocket) {
+    return this.sendError(webSocket, "This room is view-only");
   }
 
   async handleMessage(webSocket, event) {
@@ -81,6 +92,24 @@ export class RallyRoom {
     await this.cleanupExpiredRallies();
   }
 
+  async handleClose(webSocket) {
+    this.sockets.delete(webSocket);
+    if (webSocket !== this.ownerSocket || this.isClosing) return;
+
+    this.isClosing = true;
+    await this.state.storage.deleteAll();
+    for (const socket of this.sockets) {
+      try {
+        socket.send(JSON.stringify({ type: "room-closed" }));
+        socket.close(1000, "Room owner disconnected");
+      } catch {
+        this.sockets.delete(socket);
+      }
+    }
+    this.ownerSocket = null;
+    this.isClosing = false;
+  }
+
   async getRoomState() {
     return (await this.state.storage.get("roomState")) || { leaders: [], rallies: [] };
   }
@@ -112,8 +141,8 @@ export class RallyRoom {
     }
   }
 
-  sendState(webSocket, roomState, isNew = false) {
-    webSocket.send(JSON.stringify({ type: "state", ...roomState, isNew }));
+  sendState(webSocket, roomState, isNew = false, role = "viewer") {
+    webSocket.send(JSON.stringify({ type: "state", ...roomState, isNew, role }));
   }
 
   broadcastState(roomState) {
