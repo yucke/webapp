@@ -869,10 +869,29 @@
             updateSharedControls();
         }
 
-        function updateRoomStatus(message, connected = false) {
+function updateRoomStatus(message, connected = false) {
             const status = document.getElementById('roomStatus');
             const button = document.getElementById('roomConnectBtn');
-            status.textContent = message;
+            
+            // --- メッセージ内容に応じてアイコンを決定 ---
+            let icon = '📴'; // 未接続
+            
+            if (message.includes('失敗')) {
+                icon = '❌';
+            } else if (message.includes('接続中…')) {
+                icon = '⏳';
+            } else if (connected) {
+                if (roomRole === 'viewer') {
+                    icon = '👀'; // 子として参照中
+                } else {
+                    icon = '📣'; // 親として接続中
+                }
+            }
+
+            // 画面にはアイコンのみを表示し、詳細なテキストはtitle属性（ツールチップ）に入れる
+            status.textContent = icon;
+            status.title = message; 
+
             status.classList.toggle('connected', connected);
             status.classList.toggle('viewer', roomSocket && roomRole === 'viewer');
             button.textContent = roomSocket ? '切断' : '接続';
