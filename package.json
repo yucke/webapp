@@ -2,5 +2,8 @@
   "name": "wos-rally-tracker",
   "version": "1.0.0",
   "description": "Cloudflare Worker for WOS Rally Tracker",
-  "type": "module"
+  "type": "module",
+  "dependencies": {
+    "@cloudflare/kv-asset-handler": "^0.3.0"
+  }
 }
