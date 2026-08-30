@@ -863,22 +863,22 @@
             if (roomSocket?.readyState === WebSocket.OPEN) {
                 roomSocket.send(JSON.stringify(message));
             }
+        }
 
-            function canEditSharedState() {
-                if (!roomSocket || roomRole === 'owner') return true;
-                showToast('子として接続中のため、共有データは変更できません。');
-                return false;
-            }
+        function canEditSharedState() {
+            if (!roomSocket || roomRole === 'owner') return true;
+            showToast('子として接続中のため、共有データは変更できません。');
+            return false;
+        }
 
-            function updateSharedControls() {
-                const isViewer = roomSocket && roomRole === 'viewer';
-                document.querySelectorAll('[data-shared-edit]').forEach(element => {
-                    element.disabled = isViewer;
-                    element.title = isViewer ? '子として接続中のため変更できません' : '';
-                });
-                if (roomSocket && roomRole) {
-                    updateRoomStatus(roomRole === 'owner' ? `親として接続中: ${roomNumber}` : `子として参照中: ${roomNumber}`, true);
-                }
+        function updateSharedControls() {
+            const isViewer = roomSocket && roomRole === 'viewer';
+            document.querySelectorAll('[data-shared-edit]').forEach(element => {
+                element.disabled = isViewer;
+                element.title = isViewer ? '子として接続中のため変更できません' : '';
+            });
+            if (roomSocket && roomRole) {
+                updateRoomStatus(roomRole === 'owner' ? `親として接続中: ${roomNumber}` : `子として参照中: ${roomNumber}`, true);
             }
         }
 

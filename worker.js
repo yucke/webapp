@@ -48,16 +48,15 @@ export class RallyRoom {
     return new Response(null, { status: 101, webSocket: client });
   }
 
-  if (webSocket !== this.ownerSocket) {
-    return this.sendError(webSocket, "This room is view-only");
-  }
-
   async handleMessage(webSocket, event) {
     let message;
     try {
       message = JSON.parse(event.data);
     } catch {
       return this.sendError(webSocket, "Invalid message");
+    }
+    if (webSocket !== this.ownerSocket) {
+      return this.sendError(webSocket, "This room is view-only");
     }
 
     const state = await this.getRoomState();
@@ -146,10 +145,16 @@ export class RallyRoom {
   }
 
   broadcastState(roomState) {
-    const message = JSON.stringify({ type: "state", ...roomState });
     for (const socket of this.sockets) {
       try {
-        socket.send(message);
+        socket.send(
+          JSON.stringify({
+            type: "state",
+            ...roomState,
+            isNew: false,
+            role: socket === this.ownerSocket ? "owner" : "viewer",
+          }),
+        );
       } catch {
         this.sockets.delete(socket);
         socket.close(1011, "Failed to send state");
