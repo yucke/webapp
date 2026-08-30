@@ -1,0 +1,6 @@
+{
+  "name": "wos-rally-tracker",
+  "version": "1.0.0",
+  "description": "Cloudflare Worker for WOS Rally Tracker",
+  "type": "module"
+}
