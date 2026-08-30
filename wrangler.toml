@@ -1,0 +1,11 @@
+name = "wos-rally-tracker"
+main = "worker.js"
+compatibility_date = "2026-08-30"
+
+[[durable_objects.bindings]]
+name = "RALLY_ROOMS"
+class_name = "RallyRoom"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["RallyRoom"]
