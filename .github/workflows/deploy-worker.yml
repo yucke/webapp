@@ -20,7 +20,7 @@ jobs:
       - name: Install dependencies
         run: npm install
 
-      - name: Embed Worker URL in HTML
+      - name: Embed HTML in Worker
         run: node scripts/embed-worker-url.js
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
@@ -30,12 +30,17 @@ jobs:
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
 
-      - name: Commit changes
+      - name: Commit HTML changes if modified
         run: |
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action"
           git add WOS_rally_tracker.html
-          git diff --quiet && git diff --staged --quiet || (git commit -m "Update Worker URL in HTML" && git push)
+          if ! git diff --quiet && ! git diff --staged --quiet; then
+            git commit -m "Auto-update Worker URL in HTML"
+            git push
+          fi
 
-      - name: Output deployment URL
-        run: echo "✅ Worker deployed successfully at https://webapp.kiironoangel.workers.dev"
+      - name: Output deployment info
+        run: |
+          echo "✅ Worker deployed successfully!"
+          echo "🌐 Access at: https://webapp.kiironoangel.workers.dev"
