@@ -10,7 +10,7 @@ export default {
     const url = new URL(request.url);
     const room = url.searchParams.get("room") || "";
     if (!ROOM_NAME_PATTERN.test(room)) {
-      return new Response("Invalid room number", { status: 400 });
+      return new Response("Invalid room name", { status: 400 });
     }
     if (request.headers.get("Upgrade") !== "websocket") {
       return new Response("Expected WebSocket upgrade", { status: 426 });
@@ -109,8 +109,6 @@ export class RallyRoom {
       roomState.rallies = activeRallies;
       await this.saveRoomState(roomState);
       this.broadcastState(roomState);
-    } else {
-      await this.saveRoomState(roomState);
     }
   }
 
@@ -124,6 +122,7 @@ export class RallyRoom {
       try {
         socket.send(message);
       } catch {
+        this.sockets.delete(socket);
         socket.close(1011, "Failed to send state");
       }
     }
