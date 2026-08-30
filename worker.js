@@ -1,5 +1,3 @@
-import { getAssetFromKV } from '@cloudflare/kv-asset-handler';
-
 const ROOM_ID_PATTERN = /^[a-f0-9]{64}$/;
 const EXPIRY_GRACE_MS = 5 * 60 * 1000;
 
@@ -217,39 +215,53 @@ export default {
     const url = new URL(request.url);
     const pathname = url.pathname;
 
-    // WOS_rally_tracker.html にアクセスした場合のみ WebSocket を処理
-    if (pathname === "/WOS_rally_tracker.html" && url.searchParams.has("room")) {
+    // 1. WebSocket接続のみをDurable Objectsへ転送（Upgradeヘッダー確認を追加）
+    if (
+      pathname === "/WOS_rally_tracker.html" &&
+      url.searchParams.has("room") &&
+      request.headers.get("Upgrade")?.toLowerCase() === "websocket"
+    ) {
       const roomId = url.searchParams.get("room");
       return handleRallyRoom(request, env, roomId);
     }
 
-    // その他すべてのリクエストは静的アセットを返す
-    if (request.method !== "GET") {
+    if (request.method !== "GET" && request.method !== "HEAD") {
       return new Response("Method Not Allowed", { status: 405 });
     }
 
-    try {
-      // ルートパス（/）の場合は index.html を返す
-      if (pathname === "/" || pathname === "") {
-        return new Response(INDEX_HTML, {
-          headers: { "Content-Type": "text/html; charset=utf-8" },
-        });
-      }
-
-      // getAssetFromKV でアセットを取得
-      return await getAssetFromKV(request, {
-        ASSET_NAMESPACE: env.__STATIC_CONTENT,
-        ASSET_MANIFEST: JSON.parse(env.__STATIC_CONTENT_MANIFEST || "{}"),
-      });
-    } catch (error) {
-      // アセットが見つからない場合は index.html を返す
+    // 2. ルートアクセス時は埋め込みの index.html を返す
+    if (pathname === "/" || pathname === "") {
       return new Response(INDEX_HTML, {
         headers: { "Content-Type": "text/html; charset=utf-8" },
-        status: 404,
       });
     }
+
+    // 3. getAssetFromKV を廃止し、[assets] 機能 (env.ASSETS.fetch) で静的ファイルを配信
+    try {
+      let response = await env.ASSETS.fetch(request);
+      
+      // 拡張子なし（例: /WOS_sunfire_timer）でのアクセスを .html に補完して再取得
+      if (response.status === 404 && !pathname.includes(".")) {
+        const htmlRequest = new Request(new URL(`${pathname}.html`, request.url), request);
+        response = await env.ASSETS.fetch(htmlRequest);
+      }
+
+      // ファイルが見つかった場合はそのまま返す
+      if (response.status !== 404) {
+        return response;
+      }
+    } catch (error) {
+      console.error("Asset fetch error:", error);
+    }
+
+    // 4. ファイルが存在しない場合（404）は index.html をフォールバック表示
+    return new Response(INDEX_HTML, {
+      headers: { "Content-Type": "text/html; charset=utf-8" },
+      status: 404,
+    });
   },
 };
+
 
 async function handleRallyRoom(request, env, roomId) {
   if (!ROOM_ID_PATTERN.test(roomId)) {
