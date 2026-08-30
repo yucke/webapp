@@ -744,7 +744,9 @@
         const WHEEL_ITEM_HEIGHT = 40;
         const WHEEL_TOP_PADDING_ITEMS = 2;
         const LEADER_DOUBLE_TAP_DELAY_MS = 300;
-
+        
+        let pingInterval = null; 
+        
         // --- 初期化 ---
         document.addEventListener('DOMContentLoaded', () => {
             updateTzUI();
@@ -775,7 +777,7 @@
             const endpoint = document.getElementById('roomEndpoint').value.trim();
             const roomLength = countPassphraseCharacters(nextRoom);
             if (roomLength < 4 || roomLength > 64) {
-                alert('合言葉は絵文字を含めて4〜64文字で入力してください。');
+                alert('合言葉は4〜64文字で入力してください。');
                 return;
             }
             if (!endpoint) {
@@ -800,9 +802,19 @@
             updateRoomStatus('接続中…');
             roomSocket = new WebSocket(url);
             roomSocket.addEventListener('open', () => updateRoomStatus(`接続中: ${roomNumber}`, true));
+            
+            // 30秒に1回 ping を送信して切断を防ぐ
+            pingInterval = setInterval(() => {
+                    if (roomSocket && roomSocket.readyState === WebSocket.OPEN) {
+                        roomSocket.send(JSON.stringify({ type: 'ping' }));
+                    }
+                }, 30000); 
+            });
             roomSocket.addEventListener('message', handleRoomMessage);
             roomSocket.addEventListener('error', () => updateRoomStatus('接続に失敗しました'));
-            roomSocket.addEventListener('close', () => {
+                        roomSocket.addEventListener('close', () => {
+                if (pingInterval) clearInterval(pingInterval); // タイマー停止
+                
                 roomSocket = null;
                 roomRole = null;
                 updateRoomStatus('未接続（端末内のみ）');
