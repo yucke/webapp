@@ -1,17 +1,33 @@
 const ROOM_ID_PATTERN = /^[a-f0-9]{64}$/;
 const EXPIRY_GRACE_MS = 5 * 60 * 1000;
 
+// HTML content will be injected by the build process
+const HTML_CONTENT = `{{HTML_PLACEHOLDER}}`;
+
 export default {
   async fetch(request, env) {
+    const url = new URL(request.url);
+    const roomId = url.searchParams.get("room") || "";
+
+    // If no room parameter, return HTML (for direct access)
+    if (!roomId) {
+      if (request.method !== "GET") {
+        return new Response("Method Not Allowed", { status: 405 });
+      }
+      return new Response(HTML_CONTENT, {
+        headers: { "Content-Type": "text/html; charset=utf-8" },
+      });
+    }
+
+    // Otherwise, handle WebSocket connection for room
     if (request.method !== "GET") {
       return new Response("Method Not Allowed", { status: 405 });
     }
 
-    const url = new URL(request.url);
-    const roomId = url.searchParams.get("room") || "";
     if (!ROOM_ID_PATTERN.test(roomId)) {
       return new Response("Invalid room ID", { status: 400 });
     }
+
     if (request.headers.get("Upgrade") !== "websocket") {
       return new Response("Expected WebSocket upgrade", { status: 426 });
     }
