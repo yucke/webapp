@@ -333,8 +333,8 @@
             margin-left: 6px;
         }
 
-        .mode-launch { background-color: rgba(234, 179, 8, 0.2); color: var(--accent-yellow); }
-        .mode-arrival { background-color: rgba(34, 197, 94, 0.2); color: var(--accent-green); }
+        .mode-launch { background-color: rgba(8, 132, 234, 0.2); color: var(--accent-blue); }
+        .mode-arrival { background-color: rgba(145, 1, 1, 0.2); color: var(--accent-red); }
 
         /* 進行中行軍カード */
         .rally-card {
@@ -628,8 +628,9 @@
                     <div class="form-group">
                         <label>計算モード</label>
                         <select id="newCalcMode">
-                            <option value="launch">集結発起時刻計算（全体目標から逆算）</option>
-                            <option value="arrival">着弾時刻計算（発起時刻から計算）</option>
+                            <option value="arrival">敵軍</option>
+                            <option value="launch">自軍</option>
+
                         </select>
                     </div>
                     <button class="btn" data-shared-edit onclick="addLeader()">保存する</button>
@@ -688,7 +689,7 @@
                 <span style="font-size:0.75rem; color:var(--text-sub); display:block;" id="previewLabel">計算結果</span>
                 <div class="preview-time" id="previewTimeVal">--:--:--</div>
                 <div style="font-size:0.8rem; margin-top:4px;" id="previewCountdown">--:--</div>
-                <div class="warning-text" id="warningOverTime">⚠️ 指定の目標着弾時刻に間に合いません</div>
+                <div class="warning-text" id="warningOverTime">⚠️ 指定の着弾時刻に間に合いません</div>
             </div>
 
             <div class="modal-actions">
@@ -771,7 +772,7 @@
             const nextRoom = document.getElementById('roomNumber').value.trim();
             const roomLength = countPassphraseCharacters(nextRoom);
             if (roomLength < 4 || roomLength > 64) {
-                alert('合言葉は絵文字を含めて4〜64文字で入力してください。');
+                alert('合言葉は4〜64文字で入力してください。');
                 return;
             }
 
@@ -1126,7 +1127,7 @@ function updateRoomStatus(message, connected = false) {
                         <div>
                             <span class="leader-name">👤 ${escapeHtml(l.name)}</span>
                             <span class="mode-badge ${isLaunch ? 'mode-launch' : 'mode-arrival'}">
-                                ${isLaunch ? '集結発起計算' : '着弾計算'}
+                                ${isLaunch ? '自軍' : '敵軍'}
                             </span>
                             <div class="leader-meta">行軍時間: ${marchStr}</div>
                         </div>
@@ -1523,7 +1524,7 @@ function updateRoomStatus(message, connected = false) {
                             <div class="timer-val" id="cd-my-launch-${r.id}">--:--:--</div>
                         </div>
                         <div class="timer-box arrival">
-                            <span class="timer-label">目標着弾 (${arrivalStr})</span>
+                            <span class="timer-label">着弾 (${arrivalStr})</span>
                             <div class="timer-val" id="cd-arrival-${r.id}">--:--:--</div>
                         </div>
                     </div>
@@ -1563,7 +1564,7 @@ function updateRoomStatus(message, connected = false) {
 
                 if (launchDiff <= 0) {
                     card.classList.add('launched');
-                    launchCdEl.textContent = '発起済';
+                    launchCdEl.textContent = '出発済';
                     arrivalCdEl.textContent = formatCountdown(arrivalDiff);
                 } else {
                     launchCdEl.textContent = formatCountdown(launchDiff);
