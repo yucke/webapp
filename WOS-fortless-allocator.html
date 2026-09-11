@@ -1,0 +1,655 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>要塞・砦 割当くん</title>
+<style>
+  :root {
+    --primary: #2c3e50;
+    --secondary: #34495e;
+    --accent: #3498db;
+    --bg: #f4f6f7;
+    --border: #bdc3c7;
+    --error: #e74c3c;
+    --success: #27ae60;
+  }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    background-color: var(--bg);
+    color: var(--primary);
+    margin: 0;
+    padding: 10px;
+    line-height: 1.5;
+  }
+  .container {
+    max-width: 800px;
+    margin: 0 auto;
+    background: #fff;
+    padding: 20px;
+    border-radius: 8px;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+  }
+  h1, h2, h3 { margin-top: 0; }
+  .section {
+    margin-bottom: 30px;
+    padding: 15px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+  }
+  .section-title {
+    font-size: 1.2em;
+    font-weight: bold;
+    margin-bottom: 15px;
+    border-bottom: 2px solid var(--primary);
+    padding-bottom: 5px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  
+  /* 確定待ちステータスパネル */
+  .top-unassigned {
+    background: #e8f4f8; border-left: 4px solid var(--accent);
+    padding: 10px; margin-bottom: 15px; border-radius: 4px; font-weight: bold;
+  }
+  .top-unassigned.error {
+    background: #fae1e1; border-left-color: var(--error); color: var(--error);
+  }
+  .top-unassigned.success {
+    background: #e1f7e8; border-left-color: var(--success); color: var(--success);
+  }
+
+  /* 割当状況 & 希望入力グリッド (最大4列のレスポンシブ) */
+  .allocation-grid, .input-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 10px;
+  }
+  
+  /* 画面幅に応じて3列、2列へと自動調整 */
+  @media (max-width: 768px) {
+    .allocation-grid, .input-grid { grid-template-columns: repeat(3, 1fr); }
+  }
+  @media (max-width: 580px) {
+    .allocation-grid, .input-grid { grid-template-columns: repeat(2, 1fr); }
+  }
+  @media (max-width: 400px) {
+    .input-grid { grid-template-columns: 1fr; } 
+  }
+
+  /* 割当状況の各アイテム（カード型） */
+  .allocation-item {
+    display: flex; border: 1px solid var(--border); border-radius: 4px; overflow: hidden;
+  }
+  .facility-name {
+    background-color: var(--secondary); color: #fff; padding: 6px; 
+    min-width: 60px; text-align: center; font-size: 0.85em;
+  }
+  .facility-assignee {
+    background-color: #fff; padding: 6px; flex: 1; text-align: center; font-size: 0.85em;
+  }
+
+  /* 汎用バッジ装飾 */
+  .status-badge {
+    display: inline-block; padding: 2px 8px; border-radius: 12px; font-size: 0.85em; font-weight: bold;
+  }
+  .badge-setup { background: #f39c12; color: #fff; }
+  .badge-input { background: var(--accent); color: #fff; }
+  .badge-complete { background: var(--success); color: #fff; }
+  .assigned { font-weight: bold; color: var(--success); }
+  
+  /* 希望入力の各アイテム */
+  .input-item {
+    display: flex; justify-content: space-between; align-items: center;
+    background: var(--bg); padding: 8px; border-radius: 4px; border: 1px solid var(--border);
+  }
+  .input-item input[type="number"] { width: 50px; padding: 4px; text-align: right; }
+  .facility-taken { color: var(--error); font-size: 0.8em; font-weight: bold; }
+  
+  /* フォーム要素 */
+  select, button, input[type="text"] {
+    padding: 8px; border: 1px solid var(--border); border-radius: 4px; font-size: 1em;
+  }
+  button {
+    background: var(--accent); color: #fff; border: none; cursor: pointer; font-weight: bold;
+  }
+  button:hover { opacity: 0.9; }
+  button:disabled { background: #95a5a6; cursor: not-allowed; opacity: 0.7; }
+  .btn-danger { background: var(--error); }
+  .btn-success { background: var(--success); }
+  .btn-secondary { background: #7f8c8d; }
+  
+  /* コピー用小ボタン */
+  .btn-small {
+    font-size: 0.8em; padding: 4px 10px; background-color: var(--secondary);
+  }
+  
+  /* 管理者エリア (目立たないトグル) */
+  .admin-toggle-container {
+    text-align: right; margin-top: 30px;
+  }
+  .admin-toggle {
+    background: none; border: none; color: #bdc3c7; font-size: 0.85em; font-weight: normal;
+    text-decoration: underline; cursor: pointer; padding: 0;
+  }
+  .admin-toggle:hover { color: #7f8c8d; }
+
+  #adminArea { display: none; margin-top: 10px; }
+  #adminArea.open { display: block; }
+  
+  .admin-grid {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(70px, 1fr)); gap: 10px; margin-bottom: 15px;
+  }
+  .admin-grid input[type="text"] {
+    width: 4em; text-align: center;
+  }
+  .admin-actions { display: flex; gap: 10px; flex-wrap: wrap; }
+  
+  /* ユーティリティ */
+  .error-msg { color: var(--error); font-weight: bold; margin-top: 10px; }
+</style>
+</head>
+<body>
+
+<div class="container">
+  <!-- ヘッダー -->
+  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+    <h1>要塞・砦 割当くん</h1>
+    <div>状態: <span id="sysStatusBadge" class="status-badge badge-setup">準備中</span></div>
+  </div>
+
+  <!-- 割当状況 -->
+  <div class="section">
+    <div class="section-title">
+      <span>現在の割当状況</span>
+      <button class="btn-small" onclick="copyStatus()">状況をコピー</button>
+    </div>
+    
+    <!-- 未確定最上位の同盟と入力状況 -->
+    <div id="topUnassignedInfo" class="top-unassigned" style="display: none;">
+      <!-- JSで生成 -->
+    </div>
+
+    <!-- Gridレイアウト -->
+    <div id="allocationGrid" class="allocation-grid">
+      <!-- JSで生成 -->
+    </div>
+  </div>
+
+  <!-- 希望入力 -->
+  <div class="section">
+    <div class="section-title">自分の希望入力</div>
+    
+    <div style="margin-bottom: 15px;">
+      <label>自同盟を選択: </label>
+      <select id="allianceSelect" onchange="changeAlliance()">
+        <option value="">-- 選択してください --</option>
+      </select>
+    </div>
+
+    <div id="inputArea" style="display: none;">
+      <div id="inputStatus" style="margin-bottom: 10px; font-weight: bold;"></div>
+      <div class="input-grid" id="preferenceGrid">
+        <!-- JSで生成 -->
+      </div>
+      <div id="inputErrorMsg" class="error-msg"></div>
+      
+      <!-- ボタンエリア -->
+      <div style="margin-top: 15px; display: flex; justify-content: center; gap: 15px;">
+        <button id="clearBtn" class="btn-secondary" onclick="clearPreferences()">入力をクリア</button>
+        <button id="submitBtn" onclick="submitPreferences()">希望を提出する</button>
+      </div>
+    </div>
+    <div id="inputDisabledMsg" style="color: #666;">（受付開始前、または同盟を選択していません）</div>
+  </div>
+
+  <!-- 管理者トグルボタン -->
+  <div class="admin-toggle-container">
+    <button class="admin-toggle" onclick="toggleAdmin()">管理者メニューを表示</button>
+  </div>
+
+  <!-- 管理者エリア -->
+  <div id="adminArea" class="section" style="border-color: #333;">
+    <div class="section-title" style="border-bottom: 1px solid #333; margin-bottom: 10px;">管理者メニュー</div>
+    
+    <h4 style="margin-top:0;">同盟順位設定</h4>
+    <div class="admin-grid" id="adminRanks">
+      <!-- JSで生成 -->
+    </div>
+    
+    <div class="admin-actions">
+      <button onclick="startReception()">受付開始</button>
+      <button class="btn-success" onclick="finalizeAllocation()">最終確定</button>
+      <button class="btn-danger" onclick="resetSystem()">リセット</button>
+    </div>
+  </div>
+
+</div>
+
+<script>
+/**
+ * 1. 施設マスター定義
+ */
+const FACILITIES = [
+  "1号要塞", "2号要塞", "3号要塞", "4号要塞",
+  "1号砦", "2号砦", "3号砦", "4号砦",
+  "5号砦", "6号砦", "7号砦", "8号砦",
+  "9号砦", "10号砦", "11号砦", "12号砦"
+];
+
+/**
+ * 2. アプリケーション状態 (State)
+ */
+let state = getInitialState();
+
+function getInitialState() {
+  return {
+    status: 'setup', // 'setup', 'input', 'complete'
+    alliances: Array.from({length: 16}, (_, i) => ({
+      rank: i + 1,
+      name: '',
+      submitted: false,
+      preferences: {}, 
+      assignedFacilityId: null,
+      error: false
+    }))
+  };
+}
+
+let currentSelectedAlliance = "";
+
+/**
+ * 3. 描画・UI更新処理
+ */
+function render() {
+  const badge = document.getElementById('sysStatusBadge');
+  badge.className = `status-badge badge-${state.status}`;
+  badge.textContent = state.status === 'setup' ? '準備中' : state.status === 'input' ? '受付中' : '完了';
+
+  // --- 未確定最上位の情報を表示 ---
+  const topInfo = document.getElementById('topUnassignedInfo');
+  if (state.status === 'setup') {
+    topInfo.style.display = 'none';
+  } else {
+    topInfo.style.display = 'block';
+    const unassigned = state.alliances.find(a => !a.assignedFacilityId);
+    
+    if (unassigned) {
+      if (unassigned.error) {
+        topInfo.className = 'top-unassigned error';
+        topInfo.innerHTML = `⚠ 確定待ち: ${unassigned.name}（${unassigned.rank}位） ── 希望内容で確定できません（再入力待ち）`;
+      } else {
+        topInfo.className = 'top-unassigned';
+        topInfo.innerHTML = `▶ 確定待ち: ${unassigned.name}（${unassigned.rank}位） ── 提出待ち`;
+      }
+    } else {
+      topInfo.className = 'top-unassigned success';
+      topInfo.innerHTML = `✔ すべての同盟の割当が確定しました`;
+    }
+  }
+
+  // --- 割当状況グリッドの描画 ---
+  const allocGrid = document.getElementById('allocationGrid');
+  allocGrid.innerHTML = '';
+  FACILITIES.forEach(f => {
+    allocGrid.innerHTML += `
+      <div class="allocation-item">
+        <div class="facility-name">${f}</div>
+        <div class="facility-assignee">${getFacilityAssigneeText(f)}</div>
+      </div>
+    `;
+  });
+
+  // --- 管理者エリアの同盟順位設定の描画 ---
+  const adminRanks = document.getElementById('adminRanks');
+  if (adminRanks.children.length === 0) {
+    state.alliances.forEach(a => {
+      adminRanks.innerHTML += `<div><label>${a.rank}位</label><br><input type="text" id="admin_rank_${a.rank}" value="${a.name}" maxlength="4" ${state.status !== 'setup' ? 'disabled' : ''}></div>`;
+    });
+  } else {
+    state.alliances.forEach(a => {
+      const input = document.getElementById(`admin_rank_${a.rank}`);
+      input.value = a.name;
+      input.disabled = state.status !== 'setup';
+    });
+  }
+
+  // --- 自同盟選択プルダウンの描画 ---
+  const select = document.getElementById('allianceSelect');
+  const currentVal = select.value;
+  select.innerHTML = '<option value="">-- 選択してください --</option>';
+  state.alliances.forEach(a => {
+    if(a.name) select.innerHTML += `<option value="${a.name}">${a.rank}位: ${a.name}</option>`;
+  });
+  select.value = currentVal;
+
+  renderUserForm();
+}
+
+function getFacilityAssigneeText(facilityId) {
+  const alliance = state.alliances.find(a => a.assignedFacilityId === facilityId);
+  if (alliance) {
+    return `<span class="assigned">${alliance.name} 確定</span>`;
+  }
+  return '<span style="color:#aaa;">未割当</span>';
+}
+
+function renderUserForm() {
+  const inputArea = document.getElementById('inputArea');
+  const disabledMsg = document.getElementById('inputDisabledMsg');
+  const select = document.getElementById('allianceSelect');
+  const selectedName = select.value;
+  currentSelectedAlliance = selectedName;
+
+  if (state.status === 'setup' || !selectedName) {
+    inputArea.style.display = 'none';
+    disabledMsg.style.display = 'block';
+    disabledMsg.textContent = state.status === 'setup' ? '（受付開始前です）' : '（同盟を選択してください）';
+    return;
+  }
+
+  inputArea.style.display = 'block';
+  disabledMsg.style.display = 'none';
+
+  const alliance = state.alliances.find(a => a.name === selectedName);
+  const grid = document.getElementById('preferenceGrid');
+  const statusDiv = document.getElementById('inputStatus');
+  const btn = document.getElementById('submitBtn');
+  const clearBtn = document.getElementById('clearBtn');
+  document.getElementById('inputErrorMsg').textContent = '';
+
+  if (grid.children.length === 0) {
+    FACILITIES.forEach(f => {
+      grid.innerHTML += `
+        <div class="input-item">
+          <label>${f}</label>
+          <div style="text-align: right;">
+            <input type="number" id="pref_${f}" min="1" max="16" placeholder="順位">
+            <div id="taken_${f}" class="facility-taken"></div>
+          </div>
+        </div>
+      `;
+    });
+  }
+
+  const isAssigned = !!alliance.assignedFacilityId;
+  const isComplete = state.status === 'complete';
+  const isReadOnly = isAssigned || isComplete;
+
+  if (isAssigned) {
+    statusDiv.innerHTML = `<span class="assigned">【割当確定】あなたの同盟は「${alliance.assignedFacilityId}」に確定しました。</span>`;
+  } else if (alliance.error) {
+    statusDiv.innerHTML = `<span class="error-msg">⚠ 希望内容では施設を確定できません。再入力してください。</span>`;
+  } else if (alliance.submitted) {
+    statusDiv.innerHTML = `<span style="color:var(--accent);">提出済みです。割当をお待ちください。（再提出可能）</span>`;
+  } else {
+    statusDiv.innerHTML = `<span>希望順位を数字（1〜16）で入力してください。不要な箇所は空欄。</span>`;
+  }
+
+  FACILITIES.forEach(f => {
+    const input = document.getElementById(`pref_${f}`);
+    const takenLabel = document.getElementById(`taken_${f}`);
+    const assignee = state.alliances.find(a => a.assignedFacilityId === f);
+
+    if (assignee && assignee.name !== selectedName) {
+      takenLabel.textContent = `${assignee.name} 確定`;
+      input.style.display = 'none';
+      input.value = ''; 
+    } else {
+      takenLabel.textContent = '';
+      input.style.display = 'inline-block';
+      if (!input.dataset.userEdited) { 
+         input.value = alliance.preferences[f] || '';
+      }
+    }
+
+    input.disabled = isReadOnly || (assignee && assignee.name !== selectedName);
+    input.oninput = () => input.dataset.userEdited = "true";
+  });
+
+  btn.disabled = isReadOnly;
+  btn.textContent = isReadOnly ? "確定済みのため変更不可" : "希望を提出する";
+  
+  clearBtn.disabled = isReadOnly;
+}
+
+function changeAlliance() {
+  FACILITIES.forEach(f => {
+    const input = document.getElementById(`pref_${f}`);
+    if(input) delete input.dataset.userEdited;
+  });
+  renderUserForm();
+}
+
+function toggleAdmin() {
+  const area = document.getElementById('adminArea');
+  const btn = document.querySelector('.admin-toggle');
+  if (area.classList.contains('open')) {
+    area.classList.remove('open');
+    btn.textContent = '管理者メニューを表示';
+  } else {
+    area.classList.add('open');
+    btn.textContent = '管理者メニューを閉じる';
+  }
+}
+
+/**
+ * 4. アクション処理 (UIからの入力イベント)
+ */
+function startReception() {
+  if (state.status !== 'setup') return alert('現在は準備中ではありません。');
+  
+  const names = [];
+  for (let i = 1; i <= 16; i++) {
+    const val = document.getElementById(`admin_rank_${i}`).value.trim();
+    if (!val) return alert(`${i}位の同盟名が入力されていません。`);
+    if (val.length > 4) return alert(`${i}位の同盟名が4文字を超えています。`);
+    if (names.includes(val)) return alert(`同盟名「${val}」が重複しています。`);
+    names.push(val);
+  }
+
+  if (!confirm('受付を開始しますか？開始後は順位を変更できません。')) return;
+
+  state.alliances.forEach((a, index) => {
+    a.name = names[index];
+    a.submitted = false;
+    a.preferences = {};
+    a.assignedFacilityId = null;
+    a.error = false;
+  });
+  state.status = 'input';
+  
+  saveAndBroadcastState();
+}
+
+function clearPreferences() {
+  if (state.status !== 'input') return;
+  const alliance = state.alliances.find(a => a.name === currentSelectedAlliance);
+  if (!alliance || alliance.assignedFacilityId) return;
+
+  FACILITIES.forEach(f => {
+    const input = document.getElementById(`pref_${f}`);
+    if (input && !input.disabled) {
+      input.value = '';
+      input.dataset.userEdited = "true"; 
+    }
+  });
+}
+
+function submitPreferences() {
+  if (state.status !== 'input') return;
+  const alliance = state.alliances.find(a => a.name === currentSelectedAlliance);
+  if (!alliance || alliance.assignedFacilityId) return;
+
+  const prefs = {};
+  const values = [];
+  let hasInput = false;
+
+  for (const f of FACILITIES) {
+    const valStr = document.getElementById(`pref_${f}`).value;
+    if (valStr !== "") {
+      const val = Number(valStr);
+      if (!Number.isInteger(val) || val < 1 || val > 16) {
+        return showError('1〜16の整数を入力してください。');
+      }
+      if (values.includes(val)) {
+        return showError(`希望順位「${val}」が重複しています。`);
+      }
+      values.push(val);
+      prefs[f] = val;
+      hasInput = true;
+    }
+  }
+
+  if (!hasInput) return showError('少なくとも1施設以上は希望順位を入力してください。');
+
+  alliance.submitted = true;
+  alliance.preferences = prefs;
+  alliance.error = false; 
+  
+  FACILITIES.forEach(f => delete document.getElementById(`pref_${f}`).dataset.userEdited);
+
+  runAllocationLogic();
+  
+  saveAndBroadcastState();
+}
+
+function showError(msg) {
+  document.getElementById('inputErrorMsg').textContent = msg;
+}
+
+/**
+ * 5. コアロジック: 通常受付時の割当
+ */
+function runAllocationLogic() {
+  for (const alliance of state.alliances) {
+    if (alliance.assignedFacilityId) continue; 
+
+    if (!alliance.submitted) {
+      break; 
+    }
+
+    const availablePrefs = [];
+    for (const [facilityId, rank] of Object.entries(alliance.preferences)) {
+      const isTaken = state.alliances.some(a => a.assignedFacilityId === facilityId);
+      if (!isTaken) {
+        availablePrefs.push({ facilityId, rank });
+      }
+    }
+
+    if (availablePrefs.length === 0) {
+      alliance.error = true;
+      break;
+    } else {
+      availablePrefs.sort((a, b) => a.rank - b.rank);
+      const bestChoice = availablePrefs[0].facilityId;
+      
+      alliance.assignedFacilityId = bestChoice;
+      alliance.error = false;
+    }
+  }
+}
+
+/**
+ * 6. コアロジック: 最終確定
+ */
+function finalizeAllocation() {
+  if (state.status !== 'input') return alert('受付中のみ最終確定可能です。');
+  if (!confirm('最終確定しますか？\n未提出同盟をスキップして処理し、最後に残り施設をランダムに割り当てます。確定後は一切変更できません。')) return;
+
+  state.status = 'complete';
+
+  for (const alliance of state.alliances) {
+    if (alliance.assignedFacilityId) continue;
+    if (!alliance.submitted) continue; 
+
+    const availablePrefs = [];
+    for (const [facilityId, rank] of Object.entries(alliance.preferences)) {
+      const isTaken = state.alliances.some(a => a.assignedFacilityId === facilityId);
+      if (!isTaken) availablePrefs.push({ facilityId, rank });
+    }
+
+    if (availablePrefs.length > 0) {
+      availablePrefs.sort((a, b) => a.rank - b.rank);
+      alliance.assignedFacilityId = availablePrefs[0].facilityId;
+    }
+  }
+
+  const unassignedAlliances = state.alliances.filter(a => !a.assignedFacilityId);
+  const unassignedFacilities = FACILITIES.filter(f => !state.alliances.some(a => a.assignedFacilityId === f));
+
+  for (let i = unassignedFacilities.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [unassignedFacilities[i], unassignedFacilities[j]] = [unassignedFacilities[j], unassignedFacilities[i]];
+  }
+
+  unassignedAlliances.forEach((alliance, index) => {
+    alliance.assignedFacilityId = unassignedFacilities[index];
+    alliance.error = false; 
+  });
+
+  saveAndBroadcastState();
+}
+
+/**
+ * 7. コアロジック: 状況コピー
+ */
+function copyStatus() {
+  let text = "【砦要塞 割当状況】\n\n■確定\n";
+  
+  FACILITIES.forEach(f => {
+    const assignee = state.alliances.find(a => a.assignedFacilityId === f);
+    if (assignee) {
+      text += `${f}：${assignee.name}\n`;
+    } else {
+      text += `${f}：    \n`; 
+    }
+  });
+
+  text += "\n■未確定\n";
+  const unassigned = state.alliances.find(a => !a.assignedFacilityId);
+  
+  if (unassigned) {
+    text += `${unassigned.name}（${unassigned.rank}位）\n`;
+    if (unassigned.error) {
+      text += `→ ⚠ 希望内容では施設を確定できません\n→ ${unassigned.name}の希望再入力待ち\n`;
+    } else {
+      text += `→ ${unassigned.name}の確定待ち\n`;
+    }
+  } else {
+    text += "なし\n";
+  }
+
+  navigator.clipboard.writeText(text).then(() => {
+    alert('状況をクリップボードにコピーしました！チャット等に貼り付けてください。');
+  }).catch(err => {
+    alert('コピーに失敗しました。');
+    console.error(err);
+  });
+}
+
+function resetSystem() {
+  if (!confirm('システムをリセットして準備中に戻しますか？現在の設定や割当内容はすべて消去されます。')) return;
+  state = getInitialState();
+  currentSelectedAlliance = "";
+  saveAndBroadcastState();
+}
+
+/**
+ * 8. ネットワーク通信 (WebSocketのモック)
+ */
+function saveAndBroadcastState() {
+  receiveStateFromServer(state);
+}
+
+function receiveStateFromServer(newState) {
+  state = JSON.parse(JSON.stringify(newState)); 
+  render();
+}
+
+render();
+
+</script>
+</body>
+</html>
