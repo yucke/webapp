@@ -156,7 +156,10 @@
   <!-- ヘッダー -->
   <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
     <h1>要塞・砦 割当くん</h1>
-    <div>状態: <span id="sysStatusBadge" class="status-badge badge-setup">準備中</span></div>
+    <div style="display: flex; gap: 10px; align-items: center;">
+      <div>状態: <span id="sysStatusBadge" class="status-badge badge-setup">準備中</span></div>
+      <div>同期: <span id="roomStatus" class="status-badge" style="background: #95a5a6; color: #fff;">未接続</span></div>
+    </div>
   </div>
 
   <!-- 割当状況 -->
@@ -637,9 +640,114 @@ function resetSystem() {
 }
 
 /**
- * 8. ネットワーク通信 (WebSocketのモック)
+ * 8. ネットワーク通信 (WebSocket)
  */
+const WORKER_ENDPOINT = 'https://webapp.kiironoangel.workers.dev/fortless-room';
+const DEFAULT_ROOM_NAME = 'fortless-allocator-default-room';
+let roomSocket = null;
+let pingInterval = null;
+let reconnectTimer = null;
+
+async function connectWebSocket() {
+  if (roomSocket && (roomSocket.readyState === WebSocket.OPEN || roomSocket.readyState === WebSocket.CONNECTING)) {
+    return;
+  }
+
+  let url;
+  try {
+    const endpoint = (window.location.hostname.endsWith('workers.dev') || window.location.hostname.endsWith('pages.dev'))
+      ? `${window.location.origin}/fortless-room`
+      : WORKER_ENDPOINT;
+    url = new URL(endpoint);
+    url.protocol = url.protocol === 'https:' ? 'wss:' : 'ws:';
+    url.searchParams.set('room', await hashRoomPassphrase(DEFAULT_ROOM_NAME));
+  } catch (e) {
+    updateRoomStatus('接続エラー', 'error');
+    return;
+  }
+
+  updateRoomStatus('接続中…', 'connecting');
+
+  roomSocket = new WebSocket(url.toString());
+
+  roomSocket.addEventListener('open', () => {
+    updateRoomStatus('同期中', 'connected');
+    sendStateToServer();
+    if (pingInterval) clearInterval(pingInterval);
+    pingInterval = setInterval(() => {
+      if (roomSocket && roomSocket.readyState === WebSocket.OPEN) {
+        roomSocket.send(JSON.stringify({ type: 'ping' }));
+      }
+    }, 30000);
+  });
+
+  roomSocket.addEventListener('message', handleRoomMessage);
+  roomSocket.addEventListener('error', () => {
+    updateRoomStatus('接続エラー', 'error');
+  });
+  roomSocket.addEventListener('close', () => {
+    if (pingInterval) {
+      clearInterval(pingInterval);
+      pingInterval = null;
+    }
+    roomSocket = null;
+    updateRoomStatus('切断', 'disconnected');
+    if (reconnectTimer) clearTimeout(reconnectTimer);
+    reconnectTimer = setTimeout(connectWebSocket, 5000);
+  });
+}
+
+function updateRoomStatus(text, statusType) {
+  const statusBadge = document.getElementById('roomStatus');
+  if (statusBadge) {
+    statusBadge.textContent = text;
+    if (statusType === 'connected') {
+      statusBadge.style.background = 'var(--success)';
+    } else if (statusType === 'error') {
+      statusBadge.style.background = 'var(--error)';
+    } else if (statusType === 'connecting') {
+      statusBadge.style.background = 'var(--accent)';
+    } else {
+      statusBadge.style.background = '#95a5a6';
+    }
+  }
+}
+
+async function hashRoomPassphrase(passphrase) {
+  const data = new TextEncoder().encode(passphrase);
+  const hash = await crypto.subtle.digest('SHA-256', data);
+  return [...new Uint8Array(hash)].map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
+function handleRoomMessage(event) {
+  try {
+    const message = JSON.parse(event.data);
+    if (message.type === 'state') {
+      if (message.status && Array.isArray(message.alliances)) {
+        state.status = message.status;
+        state.alliances = message.alliances;
+        render();
+      }
+    }
+  } catch (e) {
+    console.error('Failed to parse WebSocket message', e);
+  }
+}
+
+function sendStateToServer() {
+  if (roomSocket && roomSocket.readyState === WebSocket.OPEN) {
+    roomSocket.send(JSON.stringify({
+      type: 'update-state',
+      state: {
+        status: state.status,
+        alliances: state.alliances
+      }
+    }));
+  }
+}
+
 function saveAndBroadcastState() {
+  sendStateToServer();
   receiveStateFromServer(state);
 }
 
@@ -648,6 +756,7 @@ function receiveStateFromServer(newState) {
   render();
 }
 
+connectWebSocket();
 render();
 
 </script>

@@ -217,7 +217,7 @@ export default {
 
     // 1. WebSocket接続のみをDurable Objectsへ転送（Upgradeヘッダー確認を追加）
     if (
-      pathname === "/rally-room" &&
+      (pathname === "/rally-room" || pathname === "/fortless-room") &&
       url.searchParams.has("room") &&
       request.headers.get("Upgrade")?.toLowerCase() === "websocket"
     ) {
@@ -313,6 +313,17 @@ export class RallyRoom {
     if (message.type === "ping") {
       return; 
     }
+
+    if (message.type === "update-state") {
+      if (message.state) {
+        const currentState = await this.getRoomState();
+        const newState = { ...currentState, ...message.state };
+        await this.saveRoomState(newState);
+        this.broadcastState(newState);
+      }
+      return;
+    }
+
     if (webSocket !== this.ownerSocket) {
       return this.sendError(webSocket, "This room is view-only");
     }
@@ -375,21 +386,26 @@ export class RallyRoom {
   }
 
   async saveRoomState(roomState) {
-    roomState.rallies.sort((a, b) => a.arrivalTimeMs - b.arrivalTimeMs);
+    if (Array.isArray(roomState.rallies)) {
+      roomState.rallies.sort((a, b) => a.arrivalTimeMs - b.arrivalTimeMs);
+    }
     await this.state.storage.put("roomState", roomState);
-    const nextExpiry = roomState.rallies.reduce(
-      (earliest, rally) => Math.min(earliest, rally.arrivalTimeMs + EXPIRY_GRACE_MS),
-      Infinity,
-    );
-    if (Number.isFinite(nextExpiry)) {
-      await this.state.storage.setAlarm(nextExpiry);
-    } else {
-      await this.state.storage.deleteAlarm();
+    if (Array.isArray(roomState.rallies)) {
+      const nextExpiry = roomState.rallies.reduce(
+        (earliest, rally) => Math.min(earliest, rally.arrivalTimeMs + EXPIRY_GRACE_MS),
+        Infinity,
+      );
+      if (Number.isFinite(nextExpiry)) {
+        await this.state.storage.setAlarm(nextExpiry);
+      } else {
+        await this.state.storage.deleteAlarm();
+      }
     }
   }
 
   async cleanupExpiredRallies() {
     const roomState = await this.getRoomState();
+    if (!Array.isArray(roomState.rallies)) return;
     const now = Date.now();
     const activeRallies = roomState.rallies.filter(
       (rally) => rally.arrivalTimeMs + EXPIRY_GRACE_MS > now,
