@@ -308,13 +308,15 @@ function render() {
   const adminRanks = document.getElementById('adminRanks');
   if (adminRanks.children.length === 0) {
     state.alliances.forEach(a => {
-      adminRanks.innerHTML += `<div><label>${a.rank}位</label><br><input type="text" id="admin_rank_${a.rank}" value="${a.name}" maxlength="4" ${state.status !== 'setup' ? 'disabled' : ''}></div>`;
+      adminRanks.innerHTML += `<div><label>${a.rank}位</label><br><input type="text" id="admin_rank_${a.rank}" value="${a.name}" maxlength="4" ${state.status !== 'setup' ? 'disabled' : ''} oninput="this.dataset.userEdited='true'"></div>`;
     });
   } else {
     state.alliances.forEach(a => {
       const input = document.getElementById(`admin_rank_${a.rank}`);
-      input.value = a.name;
-      input.disabled = state.status !== 'setup';
+      if (input && document.activeElement !== input && !input.dataset.userEdited) {
+        input.value = a.name;
+      }
+      if (input) input.disabled = state.status !== 'setup';
     });
   }
 
@@ -402,7 +404,7 @@ function renderUserForm() {
     } else {
       takenLabel.textContent = '';
       input.style.display = 'inline-block';
-      if (!input.dataset.userEdited) { 
+      if (!input.dataset.userEdited && document.activeElement !== input) { 
          input.value = alliance.preferences[f] || '';
       }
     }
@@ -453,6 +455,11 @@ function startReception() {
   }
 
   if (!confirm('受付を開始しますか？開始後は順位を変更できません。')) return;
+
+  for (let i = 1; i <= 16; i++) {
+    const input = document.getElementById(`admin_rank_${i}`);
+    if (input) delete input.dataset.userEdited;
+  }
 
   state.alliances.forEach((a, index) => {
     a.name = names[index];
@@ -672,7 +679,6 @@ async function connectWebSocket() {
 
   roomSocket.addEventListener('open', () => {
     updateRoomStatus('同期中', 'connected');
-    sendStateToServer();
     if (pingInterval) clearInterval(pingInterval);
     pingInterval = setInterval(() => {
       if (roomSocket && roomSocket.readyState === WebSocket.OPEN) {
