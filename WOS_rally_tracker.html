@@ -1033,7 +1033,7 @@ function updateRoomStatus(message, connected = false) {
             return parseTargetTimeValue(saved) ? saved : null;
         }
 
-        function updateTargetTimeUI(value) {
+        function updateTargetTimeUI(value, isSaved = false) {
             const input = document.getElementById('targetTimeInput');
             const preview = document.getElementById('targetTimePreview');
             const validation = document.getElementById('targetTimeValidation');
@@ -1050,7 +1050,7 @@ function updateRoomStatus(message, connected = false) {
 
             if (parsed) {
                 preview.textContent = formatTargetTimeValue(value);
-                validation.textContent = '保存済み';
+                validation.textContent = isSaved ? '保存済み' : '形式OK';
                 return;
             }
 
@@ -1062,8 +1062,8 @@ function updateRoomStatus(message, connected = false) {
             const input = document.getElementById('targetTimeInput');
             const value = getSavedTargetTimeValue() || getTargetTimeDigitsFromDate();
             input.value = value;
-            updateTargetTimeUI(value);
             localStorage.setItem(TARGET_TIME_STORAGE_KEY, value);
+            updateTargetTimeUI(value, true);
         }
 
         function saveTargetTime() {
@@ -1071,9 +1071,10 @@ function updateRoomStatus(message, connected = false) {
             const value = input.value.replace(/\D/g, '').slice(0, 6);
             input.value = value;
             const parsed = parseTargetTimeValue(value);
-            updateTargetTimeUI(value);
+            updateTargetTimeUI(value, false);
             if (!parsed) return false;
             localStorage.setItem(TARGET_TIME_STORAGE_KEY, value);
+            updateTargetTimeUI(value, true);
             if (selectedLeaderId) updateModalPreview();
             return true;
         }
@@ -1095,7 +1096,7 @@ function updateRoomStatus(message, connected = false) {
             const input = document.getElementById('targetTimeInput');
             const fallback = getSavedTargetTimeValue() || getTargetTimeDigitsFromDate();
             input.value = fallback;
-            updateTargetTimeUI(fallback);
+            updateTargetTimeUI(fallback, true);
             if (selectedLeaderId) updateModalPreview();
         }
 
