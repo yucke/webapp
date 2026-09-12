@@ -600,8 +600,8 @@
         <div class="target-title">🎯 目標着弾時刻 (<span class="tz-label">現地</span>)</div>
         <div class="target-time-editor">
             <div class="target-time-field">
-                <input type="text" id="targetTimeInput" inputmode="numeric" maxlength="6" placeholder="090000" aria-label="目標着弾時刻 HHmmss" autocomplete="off" oninput="handleTargetTimeInput(event)" onblur="handleTargetTimeBlur()">
-                <span class="target-time-format">HHmmss</span>
+                <input type="text" id="targetTimeInput" inputmode="numeric" maxlength="6" placeholder="090000" aria-label="目標着弾時刻 HHmmss" aria-describedby="targetTimeFormat targetTimePreview targetTimeValidation" autocomplete="off" oninput="handleTargetTimeInput(event)" onblur="handleTargetTimeBlur()">
+                <span class="target-time-format" id="targetTimeFormat">HHmmss</span>
             </div>
             <div class="target-time-preview" id="targetTimePreview">00:00:00</div>
             <div class="target-time-validation" id="targetTimeValidation"></div>
@@ -1037,16 +1037,19 @@ function updateRoomStatus(message, connected = false) {
             const input = document.getElementById('targetTimeInput');
             const preview = document.getElementById('targetTimePreview');
             const validation = document.getElementById('targetTimeValidation');
-            const parsed = parseTargetTimeValue(value);
-
-            input.classList.toggle('invalid', value.length === 6 && !parsed);
-            validation.classList.toggle('invalid', value.length === 6 && !parsed);
 
             if (!value) {
+                input.classList.remove('invalid');
+                validation.classList.remove('invalid');
                 preview.textContent = '--:--:--';
                 validation.textContent = '';
                 return;
             }
+
+            const parsed = parseTargetTimeValue(value);
+
+            input.classList.toggle('invalid', value.length === 6 && !parsed);
+            validation.classList.toggle('invalid', value.length === 6 && !parsed);
 
             if (parsed) {
                 preview.textContent = formatTargetTimeValue(value);
@@ -1055,7 +1058,9 @@ function updateRoomStatus(message, connected = false) {
             }
 
             preview.textContent = '--:--:--';
-            validation.textContent = value.length === 6 ? '00:00:00〜23:59:59 の範囲で入力してください' : '6桁の HHmmss を入力してください';
+            validation.textContent = value.length === 6
+                ? '00:00:00〜23:59:59 の範囲で入力してください（プレビューは保存済みの時刻を使用）'
+                : '6桁の HHmmss を入力してください';
         }
 
         function loadTargetTime() {
@@ -1086,6 +1091,7 @@ function updateRoomStatus(message, connected = false) {
             }
 
             updateTargetTimeUI(sanitized);
+            if (selectedLeaderId) updateModalPreview();
             if (sanitized.length === 6) {
                 saveTargetTime();
             }
