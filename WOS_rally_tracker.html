@@ -1065,10 +1065,10 @@ function updateRoomStatus(message, connected = false) {
 
         function loadTargetTime() {
             const input = document.getElementById('targetTimeInput');
-            const value = getSavedTargetTimeValue() || getTargetTimeDigitsFromDate();
+            const savedValue = getSavedTargetTimeValue();
+            const value = savedValue || getTargetTimeDigitsFromDate();
             input.value = value;
-            localStorage.setItem(TARGET_TIME_STORAGE_KEY, value);
-            updateTargetTimeUI(value, true);
+            updateTargetTimeUI(value, !!savedValue);
         }
 
         function saveTargetTime() {
@@ -1100,9 +1100,10 @@ function updateRoomStatus(message, connected = false) {
         function handleTargetTimeBlur() {
             if (saveTargetTime()) return;
             const input = document.getElementById('targetTimeInput');
-            const fallback = getSavedTargetTimeValue() || getTargetTimeDigitsFromDate();
+            const savedValue = getSavedTargetTimeValue();
+            const fallback = savedValue || getTargetTimeDigitsFromDate();
             input.value = fallback;
-            updateTargetTimeUI(fallback, true);
+            updateTargetTimeUI(fallback, !!savedValue);
             if (selectedLeaderId) updateModalPreview();
         }
 
