@@ -155,6 +155,60 @@
             font-weight: bold;
         }
 
+        .target-time-editor {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            min-width: 150px;
+        }
+
+        .target-time-field {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .target-time-field input {
+            width: 108px;
+            padding: 6px 10px;
+            text-align: center;
+            letter-spacing: 0.12em;
+            background-color: var(--input-bg);
+            border: 1px solid var(--panel-border);
+            border-radius: 4px;
+            color: var(--text-main);
+            font-size: 1.1rem;
+            font-weight: bold;
+            font-family: monospace;
+        }
+
+        .target-time-field input.invalid {
+            border-color: var(--accent-red);
+            color: var(--accent-red);
+        }
+
+        .target-time-format {
+            font-size: 0.8rem;
+            color: var(--text-sub);
+            font-family: monospace;
+        }
+
+        .target-time-preview {
+            font-family: monospace;
+            color: var(--accent-purple);
+            font-weight: bold;
+        }
+
+        .target-time-validation {
+            min-height: 1.2em;
+            font-size: 0.75rem;
+            color: var(--text-sub);
+        }
+
+        .target-time-validation.invalid {
+            color: var(--accent-red);
+        }
+
         .grid-layout {
             display: grid;
             grid-template-columns: 1fr;
@@ -529,42 +583,6 @@
         }
 
         .toast.show { opacity: 1; }
-/* Wheel picker styles */
-.wheel-picker { display:flex; gap:6px; align-items:center; }
-.wheel {
-  width: 64px;
-  height: 40px; /* show only the selected item */
-  overflow-y: scroll;
-  -webkit-overflow-scrolling: touch;
-  scroll-snap-type: y mandatory;
-  border: 1px solid var(--panel-border);
-  border-radius: 6px;
-  background: var(--input-bg);
-  position: relative;
-}
-.wheel .item {
-  height: 40px;
-  line-height:40px;
-  text-align:center;
-  font-family:monospace;
-  font-weight:bold;
-  color:var(--text-main);
-  scroll-snap-align: center;
-  user-select:none;
-}
-.wheel-mask {
-  pointer-events: none;
-  position: absolute;
-  left:0; right:0; top:0; bottom:0;
-  display:flex; align-items:center; justify-content:center;
-}
-.wheel-center {
-  width:100%; height:40px; border-top:1px solid rgba(255,255,255,0.06); border-bottom:1px solid rgba(255,255,255,0.06);
-  background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.00));
-  box-sizing:border-box;
-}
-.wheel::-webkit-scrollbar { width: 0; height: 0; }
-.wheel.selected .item { color: var(--accent-yellow); }
     </style>
 </head>
 <body>
@@ -580,12 +598,13 @@
     <!-- 目標着弾時刻バー -->
     <div class="target-bar">
         <div class="target-title">🎯 目標着弾時刻 (<span class="tz-label">現地</span>)</div>
-        <div class="wheel-picker" id="targetTimePicker">
-            <div class="wheel" id="wheelHour"><div class="wheel-mask"><div class="wheel-center"></div></div></div>
-            <span>:</span>
-            <div class="wheel" id="wheelMin"><div class="wheel-mask"><div class="wheel-center"></div></div></div>
-            <span>:</span>
-            <div class="wheel" id="wheelSec"><div class="wheel-mask"><div class="wheel-center"></div></div></div>
+        <div class="target-time-editor">
+            <div class="target-time-field">
+                <input type="text" id="targetTimeInput" inputmode="numeric" maxlength="6" placeholder="090000" aria-label="目標着弾時刻 HHmmss" autocomplete="off" oninput="handleTargetTimeInput(event)" onblur="handleTargetTimeBlur()">
+                <span class="target-time-format">HHmmss</span>
+            </div>
+            <div class="target-time-preview" id="targetTimePreview">00:00:00</div>
+            <div class="target-time-validation" id="targetTimeValidation"></div>
         </div>
         <div class="clock-display" id="systemClock">00:00:00</div>
     </div>
@@ -729,14 +748,13 @@
         let roomNumber = '';
         let roomRole = null;
         const ROOM_GRACE_MS = 10 * 1000;
+        const TARGET_TIME_STORAGE_KEY = 'rally_v7_target_time';
         
         let editingRallyId = null; // 編集中の行軍ID（新規の場合はnull）
         let selectedLeaderId = null;
         const DEFAULT_RALLY_MIN = 5;
         let selectedRallyMin = DEFAULT_RALLY_MIN;
         const pendingLeaderTapTimers = new Map();
-        const WHEEL_ITEM_HEIGHT = 40;
-        const WHEEL_TOP_PADDING_ITEMS = 2;
         const LEADER_DOUBLE_TAP_DELAY_MS = 300;
         
         let pingInterval = null; 
@@ -987,72 +1005,97 @@ function updateRoomStatus(message, connected = false) {
             return `${hStr}${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
         }
 
-        // --- 目標時刻の初期化 ---
-        // 2 padding items at top → scrollTop = (value + 2) * 40 for each value
-        function getWheelValue(wheelEl) {
-            return Math.max(0, Math.round(wheelEl.scrollTop / WHEEL_ITEM_HEIGHT) - WHEEL_TOP_PADDING_ITEMS);
+        function getTargetTimeDigitsFromDate(baseDate = new Date()) {
+            if (tzMode === 'utc') {
+                return `${String(baseDate.getUTCHours()).padStart(2, '0')}${String(baseDate.getUTCMinutes()).padStart(2, '0')}${String(baseDate.getUTCSeconds()).padStart(2, '0')}`;
+            }
+
+            return `${String(baseDate.getHours()).padStart(2, '0')}${String(baseDate.getMinutes()).padStart(2, '0')}${String(baseDate.getSeconds()).padStart(2, '0')}`;
         }
 
-        function scrollWheelTo(wheelEl, value) {
-            wheelEl.scrollTop = (value + WHEEL_TOP_PADDING_ITEMS) * WHEEL_ITEM_HEIGHT;
+        function parseTargetTimeValue(value) {
+            if (!/^\d{6}$/.test(value)) return null;
+            const h = parseInt(value.slice(0, 2), 10);
+            const m = parseInt(value.slice(2, 4), 10);
+            const s = parseInt(value.slice(4, 6), 10);
+            if (h > 23 || m > 59 || s > 59) return null;
+            return { h, m, s };
         }
 
-        function buildWheelItems(wheelEl, max, initVal) {
-            [...wheelEl.querySelectorAll('.item')].forEach(el => el.remove());
-            const mask = wheelEl.querySelector('.wheel-mask');
-            // Insert 2 top padding items before mask (so first real value can be centered)
-            const padTop1 = document.createElement('div');
-            padTop1.className = 'item';
-            wheelEl.insertBefore(padTop1, mask);
-            const padTop2 = document.createElement('div');
-            padTop2.className = 'item';
-            wheelEl.insertBefore(padTop2, mask);
-            for (let i = 0; i <= max; i++) {
-                const item = document.createElement('div');
-                item.className = 'item';
-                item.textContent = String(i).padStart(2, '0');
-                wheelEl.insertBefore(item, mask);
-            }
-            for (let p = 0; p < 2; p++) {
-                const pad = document.createElement('div');
-                pad.className = 'item';
-                wheelEl.appendChild(pad);
-            }
-            scrollWheelTo(wheelEl, initVal);
+        function formatTargetTimeValue(value) {
+            const parsed = parseTargetTimeValue(value);
+            if (!parsed) return '--:--:--';
+            return `${String(parsed.h).padStart(2, '0')}:${String(parsed.m).padStart(2, '0')}:${String(parsed.s).padStart(2, '0')}`;
+        }
 
-            // Remove any previous scroll listener before adding a new one
-            if (wheelEl._scrollAbort) wheelEl._scrollAbort.abort();
-            const ac = new AbortController();
-            wheelEl._scrollAbort = ac;
-            let scrollTimer = null;
-            wheelEl.addEventListener('scroll', () => {
-                clearTimeout(scrollTimer);
-                scrollTimer = setTimeout(() => {
-                    scrollWheelTo(wheelEl, getWheelValue(wheelEl));
-                    saveTargetTime();
-                }, 150);
-            }, { signal: ac.signal });
+        function getSavedTargetTimeValue() {
+            const saved = localStorage.getItem(TARGET_TIME_STORAGE_KEY) || '';
+            return parseTargetTimeValue(saved) ? saved : null;
+        }
+
+        function updateTargetTimeUI(value) {
+            const input = document.getElementById('targetTimeInput');
+            const preview = document.getElementById('targetTimePreview');
+            const validation = document.getElementById('targetTimeValidation');
+            const parsed = parseTargetTimeValue(value);
+
+            input.classList.toggle('invalid', value.length === 6 && !parsed);
+            validation.classList.toggle('invalid', value.length === 6 && !parsed);
+
+            if (!value) {
+                preview.textContent = '--:--:--';
+                validation.textContent = '';
+                return;
+            }
+
+            if (parsed) {
+                preview.textContent = formatTargetTimeValue(value);
+                validation.textContent = '保存済み';
+                return;
+            }
+
+            preview.textContent = '--:--:--';
+            validation.textContent = value.length === 6 ? '00:00:00〜23:59:59 の範囲で入力してください' : '6桁の HHmmss を入力してください';
         }
 
         function loadTargetTime() {
-            const now = new Date();
-            let initH, initM, initS;
-            if (tzMode === 'utc') {
-                initH = now.getUTCHours();
-                initM = now.getUTCMinutes();
-                initS = now.getUTCSeconds();
-            } else {
-                initH = now.getHours();
-                initM = now.getMinutes();
-                initS = now.getSeconds();
-            }
-
-            buildWheelItems(document.getElementById('wheelHour'), 23, initH);
-            buildWheelItems(document.getElementById('wheelMin'), 59, initM);
-            buildWheelItems(document.getElementById('wheelSec'), 59, initS);
+            const input = document.getElementById('targetTimeInput');
+            const value = getSavedTargetTimeValue() || getTargetTimeDigitsFromDate();
+            input.value = value;
+            updateTargetTimeUI(value);
+            localStorage.setItem(TARGET_TIME_STORAGE_KEY, value);
         }
 
         function saveTargetTime() {
+            const input = document.getElementById('targetTimeInput');
+            const value = input.value.replace(/\D/g, '').slice(0, 6);
+            input.value = value;
+            const parsed = parseTargetTimeValue(value);
+            updateTargetTimeUI(value);
+            if (!parsed) return false;
+            localStorage.setItem(TARGET_TIME_STORAGE_KEY, value);
+            if (selectedLeaderId) updateModalPreview();
+            return true;
+        }
+
+        function handleTargetTimeInput(event) {
+            const sanitized = event.target.value.replace(/\D/g, '').slice(0, 6);
+            if (event.target.value !== sanitized) {
+                event.target.value = sanitized;
+            }
+
+            updateTargetTimeUI(sanitized);
+            if (sanitized.length === 6) {
+                saveTargetTime();
+            }
+        }
+
+        function handleTargetTimeBlur() {
+            if (saveTargetTime()) return;
+            const input = document.getElementById('targetTimeInput');
+            const fallback = getSavedTargetTimeValue() || getTargetTimeDigitsFromDate();
+            input.value = fallback;
+            updateTargetTimeUI(fallback);
             if (selectedLeaderId) updateModalPreview();
         }
 
@@ -1083,9 +1126,9 @@ function updateRoomStatus(message, connected = false) {
         }
 
         function getTargetTimestampMs() {
-            const h = getWheelValue(document.getElementById('wheelHour'));
-            const m = getWheelValue(document.getElementById('wheelMin'));
-            const s = getWheelValue(document.getElementById('wheelSec'));
+            const currentValue = document.getElementById('targetTimeInput').value.replace(/\D/g, '').slice(0, 6);
+            const parsed = parseTargetTimeValue(currentValue) || parseTargetTimeValue(getSavedTargetTimeValue() || getTargetTimeDigitsFromDate());
+            const { h, m, s } = parsed;
 
             const now = new Date();
             let target;
@@ -1097,7 +1140,7 @@ function updateRoomStatus(message, connected = false) {
             } else {
                 target = new Date(now.getFullYear(), now.getMonth(), now.getDate(), h, m, s);
                 if (target.getTime() < now.getTime() - 12 * 3600 * 1000) {
-                    target.setDate(target.setDate() + 1);
+                    target.setDate(target.getDate() + 1);
                 }
             }
             return target.getTime();
