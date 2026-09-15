@@ -105,6 +105,7 @@
       <div id="member-status" class="status-text">状態: 未接続</div>
       <div id="member-countdown" class="countdown-time">--:--:--</div>
       <div style="margin-top: 15px; font-size: 0.9rem;">
+        <div>集結時間: <span id="member-rally-duration">0分</span></div>
         <div>出発時刻: <span id="member-departure">未定</span></div>
         <div>到着時刻: <span id="member-arrival">未定</span></div>
       </div>
@@ -173,6 +174,15 @@
 
     <div class="command-panel">
       <h3>📢 号令コマンド</h3>
+      <div class="form-group">
+        <label for="rally-duration">集結時間</label>
+        <select id="rally-duration" onchange="updateTargetTimeMinimum()">
+          <option value="0">0分（即時）</option>
+          <option value="1">1分</option>
+          <option value="5" selected>5分</option>
+          <option value="10">10分</option>
+        </select>
+      </div>
       <div class="command-grid">
         <button onclick="sendCommandReady()" style="background-color: #059669;">
           ⏱ 行軍準備号令<br><small>(一番遠い人が5秒後出発を基準にする)</small>
@@ -204,7 +214,7 @@
     let timezone = localStorage.getItem('rally_commander_timezone') || 'UTC';
 
     // メンバ用ステート
-    let myState = { departure_time: null, target_time: null };
+    let myState = { departure_time: null, march_start_time: null, target_time: null, rally_minutes: 0 };
     // 指示役用ステート
     let allMembers = [];
 
@@ -302,14 +312,16 @@
     function updateTargetTimeMinimum() {
       if (role !== 'commander') return;
       const minimumTimestamp = getEarliestTargetTime();
+      const rallyMinutes = Number(document.getElementById('rally-duration').value);
+      const adjustedMinimumTimestamp = minimumTimestamp + rallyMinutes * 60 * 1000;
       const input = document.getElementById('target-time-input');
       const label = document.getElementById('target-time-label');
       const currentLabel = document.getElementById('target-time-current');
       const minimumLabel = document.getElementById('target-time-minimum');
       label.textContent = `到着時刻指定 (${timezone})`;
-      input.min = formatInputTime(minimumTimestamp);
+      input.min = formatInputTime(adjustedMinimumTimestamp);
       currentLabel.textContent = `現在時刻: ${formatDateLabel(getServerTime())} ${formatTime(getServerTime())} (${timezone})`;
-      minimumLabel.textContent = `最短到着可能時刻: ${formatDateLabel(minimumTimestamp)} ${formatTime(minimumTimestamp)} (${timezone})`;
+      minimumLabel.textContent = `最短到着可能時刻: ${formatDateLabel(adjustedMinimumTimestamp)} ${formatTime(adjustedMinimumTimestamp)} (${timezone})`;
     }
 
     function getTargetTimestamp(timeInput) {
@@ -372,6 +384,7 @@
             myState = data.payload;
             document.getElementById('member-departure').textContent = formatTime(myState.departure_time);
             document.getElementById('member-arrival').textContent = formatTime(myState.target_time);
+            document.getElementById('member-rally-duration').textContent = `${myState.rally_minutes || 0}分`;
             if (!myState.target_time || !myState.departure_time) {
               document.getElementById('member-countdown').textContent = '--:--:--';
               document.getElementById('member-status').className = 'status-text';
@@ -381,9 +394,10 @@
         }
 
         if (data.type === 'member-reset' && role === 'member') {
-          myState = { departure_time: null, target_time: null };
+          myState = { departure_time: null, march_start_time: null, target_time: null, rally_minutes: 0 };
           document.getElementById('member-departure').textContent = '未定';
           document.getElementById('member-arrival').textContent = '未定';
+          document.getElementById('member-rally-duration').textContent = '0分';
           document.getElementById('member-countdown').textContent = '--:--:--';
           document.getElementById('member-status').className = 'status-text';
           document.getElementById('member-status').textContent = '状態: 指示待ち';
@@ -393,7 +407,7 @@
           if (syncInterval) clearInterval(syncInterval);
           syncInterval = null;
           currentRoomId = null;
-          myState = { departure_time: null, target_time: null };
+          myState = { departure_time: null, march_start_time: null, target_time: null, rally_minutes: 0 };
           document.getElementById('member-status').textContent = '状態: ルーム終了';
           document.getElementById('member-countdown').textContent = '--:--:--';
           document.getElementById('member-departure').textContent = '未定';
@@ -524,7 +538,8 @@
     function sendCommandReady() {
       const targetIds = getSelectedMemberIds();
       if (targetIds.length === 0) return alert("対象メンバを選択してください");
-      ws.send(JSON.stringify({ type: 'command_ready', payload: { target_member_ids: targetIds } }));
+      const rallyMinutes = Number(document.getElementById('rally-duration').value);
+      ws.send(JSON.stringify({ type: 'command_ready', payload: { target_member_ids: targetIds, rally_minutes: rallyMinutes } }));
     }
 
     function sendCommandTarget() {
@@ -542,12 +557,14 @@
 
       const targetTime = getTargetTimestamp(timeInput);
       const minimumTargetTime = getEarliestTargetTime();
-      if (targetTime < minimumTargetTime) {
-        alert(`指定時刻では間に合わないメンバがいます。\n最短到着可能時刻: ${formatDateLabel(minimumTargetTime)} ${formatTime(minimumTargetTime)} (${timezone})`);
+      const rallyMinutes = Number(document.getElementById('rally-duration').value);
+      const adjustedMinimumTargetTime = minimumTargetTime + rallyMinutes * 60 * 1000;
+      if (targetTime < adjustedMinimumTargetTime) {
+        alert(`指定時刻では間に合わないメンバがいます。\n最短到着可能時刻: ${formatDateLabel(adjustedMinimumTargetTime)} ${formatTime(adjustedMinimumTargetTime)} (${timezone})`);
         return;
       }
 
-      ws.send(JSON.stringify({ type: 'command_target', payload: { target_member_ids: targetIds, target_time: targetTime } }));
+      ws.send(JSON.stringify({ type: 'command_target', payload: { target_member_ids: targetIds, target_time: targetTime, rally_minutes: rallyMinutes } }));
     }
 
     function updateCommanderTable(members) {
@@ -588,6 +605,10 @@
           display.textContent = formatCountdown(remainingMs);
           statusEl.className = 'status-text status-waiting';
           statusEl.textContent = '状態: 行軍待機中';
+        } else if (myState.march_start_time && now < myState.march_start_time) {
+          display.textContent = formatCountdown(myState.march_start_time - now);
+          statusEl.className = 'status-text status-waiting';
+          statusEl.textContent = `集結中 (${myState.rally_minutes || 0}分)`;
         } else if (now < myState.target_time) {
           display.textContent = "行軍中！";
           statusEl.className = 'status-text status-marching';
