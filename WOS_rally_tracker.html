@@ -770,8 +770,7 @@
             setInterval(updateLoop, 200); // 5Hz高精度更新
         });
 
-// ★追加：WorkerのURLを固定値として定義
-        const WORKER_ENDPOINT = 'https://webapp.kiironoangel.workers.dev/rally-room';
+    const WORKER_ENDPOINT = new URL('/rally-room', window.location.href);
 
         // --- 共有ルーム ---
         function loadRoomSettings() {
@@ -796,7 +795,6 @@
 
             let url;
             try {
-                // ★固定値の WORKER_ENDPOINT を使用する
                 url = new URL(WORKER_ENDPOINT);
                 url.protocol = url.protocol === 'https:' ? 'wss:' : 'ws:';
                 url.searchParams.set('room', await hashRoomPassphrase(nextRoom));
