@@ -110,7 +110,7 @@ export class CommanderRoom {
           }
         }
 
-        const targetTimeReady = now + 3000 + (maxMarchTime * 1000);
+        const targetTimeReady = now + 5000 + (maxMarchTime * 1000);
         for (const id of payload.target_member_ids) {
           const member = this.members.get(id);
           if (member) {
