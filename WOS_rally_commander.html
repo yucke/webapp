@@ -263,6 +263,20 @@
       return `${displayDate.getUTCHours().toString().padStart(2, '0')}:${displayDate.getUTCMinutes().toString().padStart(2, '0')}:${displayDate.getUTCSeconds().toString().padStart(2, '0')}`;
     }
 
+    function formatDateLabel(timestamp) {
+      const displayDate = timezone === 'JST'
+        ? new Date(timestamp + 9 * 60 * 60 * 1000)
+        : new Date(timestamp);
+      const now = new Date(getServerTime());
+      const displayNow = timezone === 'JST'
+        ? new Date(now.getTime() + 9 * 60 * 60 * 1000)
+        : now;
+      const isTomorrow = displayDate.getUTCFullYear() !== displayNow.getUTCFullYear() ||
+        displayDate.getUTCMonth() !== displayNow.getUTCMonth() ||
+        displayDate.getUTCDate() !== displayNow.getUTCDate();
+      return isTomorrow ? '明日' : '今日';
+    }
+
     function normalizeTargetTimeInput(event) {
       const input = event.target;
       const digits = input.value.replace(/\D/g, '').slice(0, 6);
@@ -294,8 +308,8 @@
       const minimumLabel = document.getElementById('target-time-minimum');
       label.textContent = `到着時刻指定 (${timezone})`;
       input.min = formatInputTime(minimumTimestamp);
-      currentLabel.textContent = `現在時刻: ${formatTime(getServerTime())} (${timezone})`;
-      minimumLabel.textContent = `最短到着可能時刻: ${formatTime(minimumTimestamp)}`;
+      currentLabel.textContent = `現在時刻: ${formatDateLabel(getServerTime())} ${formatTime(getServerTime())} (${timezone})`;
+      minimumLabel.textContent = `最短到着可能時刻: ${formatDateLabel(minimumTimestamp)} ${formatTime(minimumTimestamp)} (${timezone})`;
     }
 
     function getTargetTimestamp(timeInput) {
@@ -529,7 +543,7 @@
       const targetTime = getTargetTimestamp(timeInput);
       const minimumTargetTime = getEarliestTargetTime();
       if (targetTime < minimumTargetTime) {
-        alert(`指定時刻では間に合わないメンバがいます。\n最短到着可能時刻: ${formatTime(minimumTargetTime)} (${timezone})`);
+        alert(`指定時刻では間に合わないメンバがいます。\n最短到着可能時刻: ${formatDateLabel(minimumTargetTime)} ${formatTime(minimumTargetTime)} (${timezone})`);
         return;
       }
 
