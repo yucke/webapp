@@ -47,7 +47,17 @@
       text-align: center; margin: 30px 0; padding: 20px;
       background: #1f2937; color: white; border-radius: 8px;
     }
-    .countdown-time { font-size: 3rem; font-weight: bold; font-variant-numeric: tabular-nums; }
+    .countdown-display {
+      display: flex; justify-content: center; align-items: baseline; gap: 18px;
+      margin: 8px 0 18px;
+    }
+    .countdown-time, .rally-duration-display {
+      font-size: 3rem; font-weight: bold; font-variant-numeric: tabular-nums;
+    }
+    .rally-duration-display { color: #e5e7eb; }
+    .countdown-green { color: #22c55e; }
+    .countdown-orange { color: #f97316; }
+    .countdown-red { color: #ef4444; }
     .status-text { font-size: 1.2rem; margin-bottom: 10px; font-weight: bold; }
     .status-waiting { color: #f59e0b; }
     .status-marching { color: #3b82f6; }
@@ -104,9 +114,11 @@
     </div>
     <div class="countdown-box">
       <div id="member-status" class="status-text">状態: 未接続</div>
-      <div id="member-countdown" class="countdown-time">--:--:--</div>
+      <div class="countdown-display">
+        <div id="member-countdown" class="countdown-time countdown-green">--:--:--</div>
+        <div id="member-rally-duration" class="rally-duration-display">0分</div>
+      </div>
       <div style="margin-top: 15px; font-size: 0.9rem;">
-        <div>集結時間: <span id="member-rally-duration">0分</span></div>
         <div>出発時刻: <span id="member-departure">未定</span></div>
         <div>到着時刻: <span id="member-arrival">未定</span></div>
       </div>
@@ -276,6 +288,25 @@
       return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
     }
 
+    function setCountdownDisplay(display, milliseconds) {
+      const remainingSeconds = Math.ceil(Math.max(0, milliseconds) / 1000);
+      display.textContent = formatCountdown(milliseconds);
+      display.classList.remove('countdown-green', 'countdown-orange', 'countdown-red');
+      if (remainingSeconds < 5) {
+        display.classList.add('countdown-red');
+      } else if (remainingSeconds < 10) {
+        display.classList.add('countdown-orange');
+      } else {
+        display.classList.add('countdown-green');
+      }
+    }
+
+    function resetCountdownDisplay(display) {
+      display.textContent = '--:--:--';
+      display.classList.remove('countdown-orange', 'countdown-red');
+      display.classList.add('countdown-green');
+    }
+
     function formatInputTime(timestamp) {
       const displayDate = timezone === 'JST'
         ? new Date(timestamp + 9 * 60 * 60 * 1000)
@@ -396,7 +427,7 @@
             document.getElementById('member-arrival').textContent = formatTime(myState.target_time);
             document.getElementById('member-rally-duration').textContent = `${myState.rally_minutes || 0}分`;
             if (!myState.target_time || !myState.departure_time) {
-              document.getElementById('member-countdown').textContent = '--:--:--';
+              resetCountdownDisplay(document.getElementById('member-countdown'));
               document.getElementById('member-status').className = 'status-text';
               document.getElementById('member-status').textContent = '状態: 指示待ち';
             }
@@ -408,7 +439,7 @@
           document.getElementById('member-departure').textContent = '未定';
           document.getElementById('member-arrival').textContent = '未定';
           document.getElementById('member-rally-duration').textContent = '0分';
-          document.getElementById('member-countdown').textContent = '--:--:--';
+          resetCountdownDisplay(document.getElementById('member-countdown'));
           document.getElementById('member-status').className = 'status-text';
           document.getElementById('member-status').textContent = '状態: 指示待ち';
         }
@@ -419,7 +450,7 @@
           currentRoomId = null;
           myState = { departure_time: null, march_start_time: null, target_time: null, rally_minutes: 0 };
           document.getElementById('member-status').textContent = '状態: ルーム終了';
-          document.getElementById('member-countdown').textContent = '--:--:--';
+          resetCountdownDisplay(document.getElementById('member-countdown'));
           document.getElementById('member-departure').textContent = '未定';
           document.getElementById('member-arrival').textContent = '未定';
           document.getElementById('member-settings').open = true;
@@ -612,19 +643,23 @@
 
         if (now < myState.departure_time) {
           const remainingMs = myState.departure_time - now;
-          display.textContent = formatCountdown(remainingMs);
+          setCountdownDisplay(display, remainingMs);
           statusEl.className = 'status-text status-waiting';
           statusEl.textContent = '状態: 行軍待機中';
         } else if (myState.march_start_time && now < myState.march_start_time) {
-          display.textContent = formatCountdown(myState.march_start_time - now);
+          setCountdownDisplay(display, myState.march_start_time - now);
           statusEl.className = 'status-text status-waiting';
           statusEl.textContent = `集結中 (${myState.rally_minutes || 0}分)`;
         } else if (now < myState.target_time) {
           display.textContent = "行軍中！";
+          display.classList.remove('countdown-orange', 'countdown-red');
+          display.classList.add('countdown-green');
           statusEl.className = 'status-text status-marching';
           statusEl.textContent = '状態: 行軍中';
         } else {
           display.textContent = "着弾！";
+          display.classList.remove('countdown-orange', 'countdown-red');
+          display.classList.add('countdown-green');
           statusEl.className = 'status-text status-arrived';
           statusEl.textContent = '状態: 到着完了';
         }
