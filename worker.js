@@ -1,5 +1,8 @@
-const ROOM_ID_PATTERN = /^[a-f0-9]{64}$/;
-const EXPIRY_GRACE_MS = 10 * 1000;
+import { handleRallyRoom, RallyRoom } from "./rally-room.js";
+import { handleFortlessRoom, FortlessRoom } from "./fortless-room.js";
+import { handleCommanderRoom, CommanderRoom } from "./commander-room.js";
+
+export { RallyRoom, FortlessRoom, CommanderRoom };
 
 // index.html を埋め込む
 const INDEX_HTML = `<!DOCTYPE html>
@@ -268,6 +271,7 @@ export default {
   },
 };
 
+/*
 // =====================================================================
 //  砦希望配置(FortlessRoom) のロジック
 // =====================================================================
@@ -669,3 +673,4 @@ export class FortlessRoom {
 
 // 旧設定との互換用。新しい要塞割当は FortlessRoom を使用する。
 export class CommanderRoom extends FortlessRoom {}
+*/
