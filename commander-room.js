@@ -125,6 +125,21 @@ export class CommanderRoom {
         if (session.role !== 'commander') return;
 
         const targetTime = payload.target_time;
+        if (!Number.isFinite(targetTime) || !Array.isArray(payload.target_member_ids)) return;
+        const selectedMembers = payload.target_member_ids
+          .map((id) => this.members.get(id))
+          .filter(Boolean);
+        const longestMarchTime = selectedMembers.reduce(
+          (longest, member) => Math.max(longest, Number(member.march_time) || 0),
+          0,
+        );
+        if (targetTime < now + longestMarchTime * 1000) {
+          session.ws.send(JSON.stringify({
+            type: 'command-error',
+            message: '指定時刻では間に合わないメンバがいます',
+          }));
+          return;
+        }
         for (const id of payload.target_member_ids) {
           const member = this.members.get(id);
           if (member) {

@@ -178,7 +178,9 @@
           ⏱ 行軍準備号令<br><small>(一番遠い人が5秒後出発を基準にする)</small>
         </button>
         <div style="border: 1px solid #ccc; padding: 10px; border-radius: 4px; text-align: center; background: white;">
-          <input type="time" id="target-time-input" step="1" style="margin-bottom: 10px;">
+          <label for="target-time-input" id="target-time-label">到着時刻指定 (UTC)</label>
+          <input type="time" id="target-time-input" step="1" style="margin-bottom: 10px;" onchange="updateTargetTimeMinimum()" oninput="updateTargetTimeMinimum()">
+          <small id="target-time-minimum" style="display: block; margin-bottom: 10px; color: #6b7280;"></small>
           <button onclick="sendCommandTarget()">指定時刻で到着指示</button>
         </div>
       </div>
@@ -237,6 +239,7 @@
       document.getElementById('commander-timezone').value = timezone;
       if (role === 'commander') {
         updateCommanderTable(allMembers);
+        updateTargetTimeMinimum();
       } else {
         document.getElementById('member-departure').textContent = formatTime(myState.departure_time);
         document.getElementById('member-arrival').textContent = formatTime(myState.target_time);
@@ -250,6 +253,55 @@
       const m = Math.floor((totalSec % 3600) / 60);
       const s = totalSec % 60;
       return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+    }
+
+    function formatInputTime(timestamp) {
+      const displayDate = timezone === 'JST'
+        ? new Date(timestamp + 9 * 60 * 60 * 1000)
+        : new Date(timestamp);
+      return `${displayDate.getUTCHours().toString().padStart(2, '0')}:${displayDate.getUTCMinutes().toString().padStart(2, '0')}:${displayDate.getUTCSeconds().toString().padStart(2, '0')}`;
+    }
+
+    function getSelectedMembers() {
+      const selectedIds = new Set(getSelectedMemberIds());
+      return allMembers.filter(member => selectedIds.has(member.member_id));
+    }
+
+    function getEarliestTargetTime() {
+      const maxMarchTime = getSelectedMembers().reduce(
+        (longest, member) => Math.max(longest, Number(member.march_time) || 0),
+        0,
+      );
+      return getServerTime() + (maxMarchTime * 1000);
+    }
+
+    function updateTargetTimeMinimum() {
+      if (role !== 'commander') return;
+      const minimumTimestamp = getEarliestTargetTime();
+      const input = document.getElementById('target-time-input');
+      const label = document.getElementById('target-time-label');
+      const minimumLabel = document.getElementById('target-time-minimum');
+      label.textContent = `到着時刻指定 (${timezone})`;
+      input.min = formatInputTime(minimumTimestamp);
+      minimumLabel.textContent = `最短到着可能時刻: ${formatTime(minimumTimestamp)}`;
+    }
+
+    function getTargetTimestamp(timeInput) {
+      const [hours, minutes, seconds] = timeInput.split(':').map(Number);
+      const now = new Date(getServerTime());
+      const displayNow = timezone === 'JST'
+        ? new Date(now.getTime() + 9 * 60 * 60 * 1000)
+        : now;
+      let targetTime = Date.UTC(
+        displayNow.getUTCFullYear(),
+        displayNow.getUTCMonth(),
+        displayNow.getUTCDate(),
+        hours,
+        minutes,
+        seconds || 0,
+      ) - (timezone === 'JST' ? 9 * 60 * 60 * 1000 : 0);
+      if (targetTime < getServerTime()) targetTime += 24 * 60 * 60 * 1000;
+      return targetTime;
     }
 
     // --- WebSocket 通信管理 ---
@@ -279,6 +331,11 @@
           const latency = now - data.payload.client_time;
           serverOffset = data.payload.server_time + (latency / 2) - now;
           console.log(`時刻補正: オフセット ${serverOffset}ms (レイテンシ ${latency}ms)`);
+        }
+
+        if (data.type === 'command-error') {
+          alert(data.message || '指示を送信できませんでした');
+          return;
         }
 
         if (data.type === 'state_update') {
@@ -405,6 +462,7 @@
       document.querySelectorAll('.member-checkbox').forEach(checkbox => {
         checkbox.checked = selectedIds.has(checkbox.value);
       });
+      updateTargetTimeMinimum();
     }
 
     function selectAllMembers() {
@@ -449,23 +507,12 @@
       if (!timeInput) return alert("時刻を指定してください");
       if (targetIds.length === 0) return alert("対象メンバを選択してください");
 
-      // 今日の日付の指定時刻のタイムスタンプを作成
-      const [hours, minutes, seconds] = timeInput.split(':');
-      const now = new Date();
-      const numericHours = Number(hours);
-      const numericMinutes = Number(minutes);
-      const numericSeconds = Number(seconds || 0);
-      const displayNow = timezone === 'JST'
-        ? new Date(now.getTime() + 9 * 60 * 60 * 1000)
-        : now;
-      const targetTime = Date.UTC(
-        displayNow.getUTCFullYear(),
-        displayNow.getUTCMonth(),
-        displayNow.getUTCDate(),
-        numericHours,
-        numericMinutes,
-        numericSeconds,
-      ) - (timezone === 'JST' ? 9 * 60 * 60 * 1000 : 0);
+      const targetTime = getTargetTimestamp(timeInput);
+      const minimumTargetTime = getEarliestTargetTime();
+      if (targetTime < minimumTargetTime) {
+        alert(`指定時刻では間に合わないメンバがいます。\n最短到着可能時刻: ${formatTime(minimumTargetTime)} (${timezone})`);
+        return;
+      }
 
       ws.send(JSON.stringify({ type: 'command_target', payload: { target_member_ids: targetIds, target_time: targetTime } }));
     }
@@ -492,6 +539,7 @@
         `;
         tbody.appendChild(tr);
       });
+      updateTargetTimeMinimum();
     }
 
     // --- 描画ループ (毎フレーム更新) ---
