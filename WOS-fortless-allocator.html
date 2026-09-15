@@ -660,6 +660,8 @@ async function connectWebSocket() {
     return;
   }
 
+  const isReconnectAttempt = document.getElementById('roomStatus')?.dataset.statusType === 'connecting';
+
   let url;
   try {
     const endpoint = (window.location.hostname.endsWith('workers.dev') || window.location.hostname.endsWith('pages.dev'))
@@ -673,7 +675,7 @@ async function connectWebSocket() {
     return;
   }
 
-  updateRoomStatus('接続中…', 'connecting');
+  if (!isReconnectAttempt) updateRoomStatus('接続中…', 'connecting');
 
   roomSocket = new WebSocket(url.toString());
 
@@ -688,16 +690,13 @@ async function connectWebSocket() {
   });
 
   roomSocket.addEventListener('message', handleRoomMessage);
-  roomSocket.addEventListener('error', () => {
-    updateRoomStatus('接続エラー', 'error');
-  });
   roomSocket.addEventListener('close', () => {
     if (pingInterval) {
       clearInterval(pingInterval);
       pingInterval = null;
     }
     roomSocket = null;
-    updateRoomStatus('切断', 'disconnected');
+    updateRoomStatus('再接続待ち', 'connecting');
     if (reconnectTimer) clearTimeout(reconnectTimer);
     reconnectTimer = setTimeout(connectWebSocket, 5000);
   });
@@ -706,7 +705,9 @@ async function connectWebSocket() {
 function updateRoomStatus(text, statusType) {
   const statusBadge = document.getElementById('roomStatus');
   if (statusBadge) {
+    if (statusBadge.textContent === text && statusBadge.dataset.statusType === statusType) return;
     statusBadge.textContent = text;
+    statusBadge.dataset.statusType = statusType;
     if (statusType === 'connected') {
       statusBadge.style.background = 'var(--success)';
     } else if (statusType === 'error') {

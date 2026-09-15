@@ -196,13 +196,7 @@ const INDEX_HTML = `<!DOCTYPE html>
             </div>
             <a href="WOS_rally_tracker.html" class="btn" target="_blank" rel="noopener noreferrer">ツールを開く</a>
         </div>
-        <div class="tool-card">
-            <div class="tool-card-content">
-                <h2>砦・要塞 行軍同期システム</h2>
-                <p>複数人で同時に施設へ着弾するための、ミリ秒単位のカウントダウンツールです。指示役が「合言葉」を決めて号令を出せます。</p>
-            </div>
-            <a href="WOS_fortless_sync.html" class="btn" target="_blank" rel="noopener noreferrer">ツールを開く</a>
-        </div>
+
 
     </main>
 
