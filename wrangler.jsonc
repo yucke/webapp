@@ -26,14 +26,21 @@
     ]
   },
   "migrations": [
+    "migrations": [
+    {
+      "tag": "v1",
+      "new_sqlite_classes": [
+        "RallyRoom"
+      ]
+    },
     {
       "tag": "v2",
       "new_sqlite_classes": [
-        "RallyRoom",
         "FortlessRoom",
         "CommanderRoom"
       ]
     }
+  ],
   ],
   "assets": {
     "directory": "."
