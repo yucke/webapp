@@ -86,7 +86,8 @@
       display: flex; align-items: center; gap: 8px; margin-bottom: 15px;
       font-size: 0.9rem;
     }
-    .timezone-control select { width: auto; padding: 6px 8px; }
+    .radio-group { display: flex; gap: 10px; flex-wrap: wrap; }
+    .radio-option { display: inline-flex; align-items: center; gap: 4px; font-weight: normal; }
   </style>
 </head>
 <body>
@@ -95,11 +96,11 @@
   <div id="member-view" class="container hidden">
     <h2>🎯 メンバ参加画面</h2>
     <div class="timezone-control">
-      <label for="member-timezone">時刻表示</label>
-      <select id="member-timezone" onchange="changeTimezone(this.value)">
-        <option value="UTC">UTC</option>
-        <option value="JST">JST</option>
-      </select>
+      <span>時刻表示</span>
+      <div class="radio-group">
+        <label class="radio-option"><input type="radio" name="member-timezone" value="UTC" onchange="changeTimezone(this.value)"> UTC</label>
+        <label class="radio-option"><input type="radio" name="member-timezone" value="JST" onchange="changeTimezone(this.value)"> JST</label>
+      </div>
     </div>
     <div class="countdown-box">
       <div id="member-status" class="status-text">状態: 未接続</div>
@@ -135,11 +136,11 @@
   <div id="commander-view" class="container hidden">
     <h2>👑 指示役画面</h2>
     <div class="timezone-control">
-      <label for="commander-timezone">時刻表示</label>
-      <select id="commander-timezone" onchange="changeTimezone(this.value)">
-        <option value="UTC">UTC</option>
-        <option value="JST">JST</option>
-      </select>
+      <span>時刻表示</span>
+      <div class="radio-group">
+        <label class="radio-option"><input type="radio" name="commander-timezone" value="UTC" onchange="changeTimezone(this.value)"> UTC</label>
+        <label class="radio-option"><input type="radio" name="commander-timezone" value="JST" onchange="changeTimezone(this.value)"> JST</label>
+      </div>
     </div>
     <div class="form-group" style="display: flex; gap: 10px;">
       <input type="text" id="cmd-room-id" placeholder="合言葉" style="flex: 1;">
@@ -176,12 +177,12 @@
       <h3>📢 号令コマンド</h3>
       <div class="form-group">
         <label for="rally-duration">集結時間</label>
-        <select id="rally-duration" onchange="updateTargetTimeMinimum()">
-          <option value="0">0分（即時）</option>
-          <option value="1">1分</option>
-          <option value="5" selected>5分</option>
-          <option value="10">10分</option>
-        </select>
+        <div class="radio-group">
+          <label class="radio-option"><input type="radio" name="rally-duration" value="0" onchange="updateTargetTimeMinimum()"> 0分（即時）</label>
+          <label class="radio-option"><input type="radio" name="rally-duration" value="1" onchange="updateTargetTimeMinimum()"> 1分</label>
+          <label class="radio-option"><input type="radio" name="rally-duration" value="5" checked onchange="updateTargetTimeMinimum()"> 5分</label>
+          <label class="radio-option"><input type="radio" name="rally-duration" value="10" onchange="updateTargetTimeMinimum()"> 10分</label>
+        </div>
       </div>
       <div class="command-grid">
         <button onclick="sendCommandReady()" style="background-color: #059669;">
@@ -224,7 +225,7 @@
     } else {
       document.getElementById('member-view').classList.remove('hidden');
     }
-    document.getElementById(`${role}-timezone`).value = timezone;
+    setTimezoneSelection(timezone);
 
     // --- ユーティリティ ---
     function getServerTime() {
@@ -246,8 +247,7 @@
     function changeTimezone(value) {
       timezone = value === 'JST' ? 'JST' : 'UTC';
       localStorage.setItem('rally_commander_timezone', timezone);
-      document.getElementById('member-timezone').value = timezone;
-      document.getElementById('commander-timezone').value = timezone;
+      setTimezoneSelection(timezone);
       if (role === 'commander') {
         updateCommanderTable(allMembers);
         updateTargetTimeMinimum();
@@ -255,6 +255,16 @@
         document.getElementById('member-departure').textContent = formatTime(myState.departure_time);
         document.getElementById('member-arrival').textContent = formatTime(myState.target_time);
       }
+    }
+
+    function setTimezoneSelection(value) {
+      document.querySelectorAll('input[name="member-timezone"], input[name="commander-timezone"]').forEach(input => {
+        input.checked = input.value === value;
+      });
+    }
+
+    function getRallyMinutes() {
+      return Number(document.querySelector('input[name="rally-duration"]:checked')?.value || 0);
     }
 
     function formatCountdown(ms) {
@@ -312,7 +322,7 @@
     function updateTargetTimeMinimum() {
       if (role !== 'commander') return;
       const minimumTimestamp = getEarliestTargetTime();
-      const rallyMinutes = Number(document.getElementById('rally-duration').value);
+      const rallyMinutes = getRallyMinutes();
       const adjustedMinimumTimestamp = minimumTimestamp + rallyMinutes * 60 * 1000;
       const input = document.getElementById('target-time-input');
       const label = document.getElementById('target-time-label');
@@ -538,7 +548,7 @@
     function sendCommandReady() {
       const targetIds = getSelectedMemberIds();
       if (targetIds.length === 0) return alert("対象メンバを選択してください");
-      const rallyMinutes = Number(document.getElementById('rally-duration').value);
+      const rallyMinutes = getRallyMinutes();
       ws.send(JSON.stringify({ type: 'command_ready', payload: { target_member_ids: targetIds, rally_minutes: rallyMinutes } }));
     }
 
@@ -557,7 +567,7 @@
 
       const targetTime = getTargetTimestamp(timeInput);
       const minimumTargetTime = getEarliestTargetTime();
-      const rallyMinutes = Number(document.getElementById('rally-duration').value);
+      const rallyMinutes = getRallyMinutes();
       const adjustedMinimumTargetTime = minimumTargetTime + rallyMinutes * 60 * 1000;
       if (targetTime < adjustedMinimumTargetTime) {
         alert(`指定時刻では間に合わないメンバがいます。\n最短到着可能時刻: ${formatDateLabel(adjustedMinimumTargetTime)} ${formatTime(adjustedMinimumTargetTime)} (${timezone})`);
