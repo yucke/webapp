@@ -1,14 +1,37 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "webapp",
-  "compatibility_date": "2026-07-24",
+  "name": "wos-rally-tracker",
+  "main": "worker.js",
+  "compatibility_date": "2026-08-30",
   "observability": {
     "enabled": true
   },
-  "assets": {
-    "directory": "."
-  },
   "compatibility_flags": [
     "nodejs_compat"
-  ]
+  ],
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "RALLY_ROOMS",
+        "class_name": "RallyRoom"
+      },
+      {
+        "name": "FORTLESS_ROOMS",
+        "class_name": "FortlessRoom"
+      }
+    ]
+  },
+  "migrations": [
+    {
+      "tag": "v1",
+      "new_sqlite_classes": ["RallyRoom"]
+    },
+    {
+      "tag": "v2",
+      "new_classes": ["FortlessRoom"]
+    }
+  ],
+  "assets": {
+    "directory": "."
+  }
 }
