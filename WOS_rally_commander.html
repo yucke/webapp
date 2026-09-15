@@ -179,7 +179,8 @@
         </button>
         <div style="border: 1px solid #ccc; padding: 10px; border-radius: 4px; text-align: center; background: white;">
           <label for="target-time-input" id="target-time-label">到着時刻指定 (UTC)</label>
-          <input type="time" id="target-time-input" step="1" style="margin-bottom: 10px;" onchange="updateTargetTimeMinimum()" oninput="updateTargetTimeMinimum()">
+          <input type="text" id="target-time-input" inputmode="numeric" maxlength="8" placeholder="HH:MM:SS" autocomplete="off" style="margin-bottom: 10px;" onchange="updateTargetTimeMinimum()" oninput="normalizeTargetTimeInput(event)">
+          <small id="target-time-current" style="display: block; margin-bottom: 4px; color: #6b7280;"></small>
           <small id="target-time-minimum" style="display: block; margin-bottom: 10px; color: #6b7280;"></small>
           <button onclick="sendCommandTarget()">指定時刻で到着指示</button>
         </div>
@@ -262,6 +263,15 @@
       return `${displayDate.getUTCHours().toString().padStart(2, '0')}:${displayDate.getUTCMinutes().toString().padStart(2, '0')}:${displayDate.getUTCSeconds().toString().padStart(2, '0')}`;
     }
 
+    function normalizeTargetTimeInput(event) {
+      const input = event.target;
+      const digits = input.value.replace(/\D/g, '').slice(0, 6);
+      input.value = digits.replace(/(\d{2})(\d{0,2})(\d{0,2})/, (_, hours, minutes, seconds) =>
+        [hours, minutes, seconds].filter(Boolean).join(':'),
+      );
+      updateTargetTimeMinimum();
+    }
+
     function getSelectedMembers() {
       const selectedIds = new Set(getSelectedMemberIds());
       return allMembers.filter(member => selectedIds.has(member.member_id));
@@ -280,9 +290,11 @@
       const minimumTimestamp = getEarliestTargetTime();
       const input = document.getElementById('target-time-input');
       const label = document.getElementById('target-time-label');
+      const currentLabel = document.getElementById('target-time-current');
       const minimumLabel = document.getElementById('target-time-minimum');
       label.textContent = `到着時刻指定 (${timezone})`;
       input.min = formatInputTime(minimumTimestamp);
+      currentLabel.textContent = `現在時刻: ${formatTime(getServerTime())} (${timezone})`;
       minimumLabel.textContent = `最短到着可能時刻: ${formatTime(minimumTimestamp)}`;
     }
 
@@ -506,6 +518,13 @@
       const targetIds = getSelectedMemberIds();
       if (!timeInput) return alert("時刻を指定してください");
       if (targetIds.length === 0) return alert("対象メンバを選択してください");
+      if (!/^\d{2}:\d{2}:\d{2}$/.test(timeInput)) {
+        return alert("到着時刻は HH:MM:SS の形式で入力してください");
+      }
+      const [inputHours, inputMinutes, inputSeconds] = timeInput.split(':').map(Number);
+      if (inputHours > 23 || inputMinutes > 59 || inputSeconds > 59) {
+        return alert("有効な時刻を入力してください");
+      }
 
       const targetTime = getTargetTimestamp(timeInput);
       const minimumTargetTime = getEarliestTargetTime();
@@ -566,6 +585,7 @@
         }
       } 
       else if (role === 'commander') {
+        updateTargetTimeMinimum();
         allMembers.forEach(member => {
           const tr = document.getElementById(`row-${member.member_id}`);
           const statusEl = document.getElementById(`status-${member.member_id}`);
