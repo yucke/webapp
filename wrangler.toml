@@ -22,15 +22,7 @@ class_name = "CommanderRoom"
 # ==========================================
 [[migrations]]
 tag = "v1"
-new_sqlite_classes = ["RallyRoom"]
-
-[[migrations]]
-tag = "v2"
-new_classes = ["FortlessRoom"]
-
-[[migrations]]
-tag = "v3"
-new_classes = ["CommanderRoom"]
+new_sqlite_classes = ["RallyRoom", "FortlessRoom", "CommanderRoom"]
 
 [env.production]
 vars = { ENVIRONMENT = "production" }
