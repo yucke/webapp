@@ -495,7 +495,7 @@ function isRally(rally) {
 
 
 // =====================================================================
-// 新規: 砦・要塞 行軍同期システム (CommanderRoom) のロジック
+// 砦・要塞割当の同期システム (FortlessRoom) のロジック
 // =====================================================================
 async function handleCommanderRoom(request, env, roomId) {
   // 合言葉はユーザーが任意に入力するため、厳密なハッシュチェックは省き文字数のみ制限
@@ -506,13 +506,12 @@ async function handleCommanderRoom(request, env, roomId) {
   return env.COMMANDER_ROOMS.get(id).fetch(request);
 }
 
-export class CommanderRoom {
+export class FortlessRoom {
   constructor(state, env) {
     this.state = state;
     // メモリ上でメンバーとセッションを管理
     this.members = new Map();
     this.sessions = [];
-    this.allocatorState = null;
   }
 
   async fetch(request) {
@@ -538,7 +537,7 @@ export class CommanderRoom {
     return new Response(null, { status: 101, webSocket: client });
   }
 
-  handleMessage(session, event) {
+  async handleMessage(session, event) {
     let data;
     try {
       data = JSON.parse(event.data);
@@ -551,8 +550,11 @@ export class CommanderRoom {
 
     switch (type) {
       case 'get-state':
-        if (this.allocatorState) {
-          session.ws.send(JSON.stringify({ type: 'state', ...this.allocatorState }));
+        {
+          const allocatorState = await this.state.storage.get('allocatorState');
+          if (allocatorState) {
+            session.ws.send(JSON.stringify({ type: 'state', ...allocatorState }));
+          }
         }
         break;
 
@@ -560,13 +562,14 @@ export class CommanderRoom {
         if (!payload?.state || typeof payload.state.status !== 'string' || !Array.isArray(payload.state.alliances)) {
           return;
         }
-        this.allocatorState = {
+        const allocatorState = {
           status: payload.state.status,
           alliances: payload.state.alliances
         };
+        await this.state.storage.put('allocatorState', allocatorState);
         for (const currentSession of this.sessions) {
           if (currentSession.ws.readyState === 1) {
-            currentSession.ws.send(JSON.stringify({ type: 'state', ...this.allocatorState }));
+            currentSession.ws.send(JSON.stringify({ type: 'state', ...allocatorState }));
           }
         }
         break;
@@ -663,3 +666,6 @@ export class CommanderRoom {
     }
   }
 }
+
+// 旧設定との互換用。新しい要塞割当は FortlessRoom を使用する。
+export class CommanderRoom extends FortlessRoom {}
