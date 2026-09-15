@@ -76,6 +76,12 @@
     .close-room-button {
       width: auto; background-color: #b91c1c; margin-top: 15px;
     }
+    .member-selection-actions {
+      display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 10px;
+    }
+    .member-selection-actions button {
+      width: auto; font-size: 0.9rem; padding: 8px 12px;
+    }
     .timezone-control {
       display: flex; align-items: center; gap: 8px; margin-bottom: 15px;
       font-size: 0.9rem;
@@ -141,6 +147,12 @@
     <button id="close-room-button" class="close-room-button hidden" onclick="closeCommanderRoom()">ルームを閉じる</button>
 
     <div class="table-responsive">
+      <div class="member-selection-actions" aria-label="メンバ一括選択">
+        <button type="button" onclick="selectAllMembers()">全員</button>
+        <button type="button" onclick="selectAvailableMembers()">待機中・行軍中を除く全員</button>
+        <button type="button" onclick="selectArrivedMembers()">到着済み全員</button>
+        <button type="button" onclick="resetSelectedMembers()">選択メンバを指示待ちに戻す</button>
+      </div>
       <table id="members-table">
         <thead>
           <tr>
@@ -277,6 +289,11 @@
             myState = data.payload;
             document.getElementById('member-departure').textContent = formatTime(myState.departure_time);
             document.getElementById('member-arrival').textContent = formatTime(myState.target_time);
+            if (!myState.target_time || !myState.departure_time) {
+              document.getElementById('member-countdown').textContent = '--:--:--';
+              document.getElementById('member-status').className = 'status-text';
+              document.getElementById('member-status').textContent = '状態: 指示待ち';
+            }
           }
         }
 
@@ -374,6 +391,43 @@
       return Array.from(document.querySelectorAll('.member-checkbox:checked')).map(cb => cb.value);
     }
 
+    function setSelectedMembers(memberIds) {
+      const selectedIds = new Set(memberIds);
+      document.querySelectorAll('.member-checkbox').forEach(checkbox => {
+        checkbox.checked = selectedIds.has(checkbox.value);
+      });
+    }
+
+    function selectAllMembers() {
+      setSelectedMembers(allMembers.map(member => member.member_id));
+    }
+
+    function selectAvailableMembers() {
+      const now = getServerTime();
+      const availableMembers = allMembers.filter(member => {
+        const isAssigned = Number.isFinite(member.departure_time) && Number.isFinite(member.target_time);
+        const isInProgress = isAssigned && now < member.target_time;
+        return !isInProgress;
+      });
+      setSelectedMembers(availableMembers.map(member => member.member_id));
+    }
+
+    function selectArrivedMembers() {
+      const now = getServerTime();
+      const arrivedMembers = allMembers.filter(member =>
+        Number.isFinite(member.target_time) && now >= member.target_time,
+      );
+      setSelectedMembers(arrivedMembers.map(member => member.member_id));
+    }
+
+    function resetSelectedMembers() {
+      const targetIds = getSelectedMemberIds();
+      if (targetIds.length === 0) return alert("対象メンバを選択してください");
+      if (!confirm('選択したメンバを指示待ちに戻しますか？')) return;
+      if (!ws || ws.readyState !== WebSocket.OPEN) return alert("ルームに接続していません");
+      ws.send(JSON.stringify({ type: 'reset-members', payload: { target_member_ids: targetIds } }));
+    }
+
     function sendCommandReady() {
       const targetIds = getSelectedMemberIds();
       if (targetIds.length === 0) return alert("対象メンバを選択してください");
@@ -456,12 +510,17 @@
       } 
       else if (role === 'commander') {
         allMembers.forEach(member => {
-          if (!member.target_time || !member.departure_time) return;
-          
           const tr = document.getElementById(`row-${member.member_id}`);
           const statusEl = document.getElementById(`status-${member.member_id}`);
           const countdownEl = document.getElementById(`countdown-${member.member_id}`);
           if (!tr) return;
+
+          if (!member.target_time || !member.departure_time) {
+            tr.className = '';
+            statusEl.textContent = '指示待ち';
+            countdownEl.textContent = '--';
+            return;
+          }
 
           if (now < member.departure_time) {
             tr.className = 'row-waiting';

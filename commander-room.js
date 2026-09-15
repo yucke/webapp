@@ -135,6 +135,17 @@ export class CommanderRoom {
         this.broadcastState();
         break;
 
+      case 'reset-members':
+        if (session.role !== 'commander' || !Array.isArray(payload?.target_member_ids)) return;
+        for (const id of payload.target_member_ids) {
+          const member = this.members.get(id);
+          if (!member) continue;
+          member.target_time = null;
+          member.departure_time = null;
+        }
+        this.broadcastState();
+        break;
+
       case 'close-room':
         if (session.role !== 'commander') return;
         await this.closeRoom();
