@@ -134,7 +134,26 @@ export class CommanderRoom {
         }
         this.broadcastState();
         break;
+
+      case 'close-room':
+        if (session.role !== 'commander') return;
+        await this.closeRoom();
+        break;
     }
+  }
+
+  async closeRoom() {
+    await this.state.storage.deleteAll();
+    for (const session of this.sessions) {
+      try {
+        session.ws.send(JSON.stringify({ type: 'room-closed' }));
+        session.ws.close(1000, 'Room closed by commander');
+      } catch {
+        // 既に切断された接続は破棄する
+      }
+    }
+    this.sessions = [];
+    this.members.clear();
   }
 
   broadcastState() {
