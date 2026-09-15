@@ -226,6 +226,10 @@ export default {
       if (pathname === "/fortless-room") {
         return handleFortlessRoom(request, env, roomId);
       }
+
+      if (pathname === "/commander-room") {
+        return handleCommanderRoom(request, env, roomId);
+      }
     }
 
     if (request.method !== "GET" && request.method !== "HEAD") {
@@ -264,9 +268,19 @@ export default {
   },
 };
 
+// =====================================================================
+//  砦希望配置(FortlessRoom) のロジック
+// =====================================================================
+async function handleFortlessRoom(request, env, roomId) {
+  if (!ROOM_ID_PATTERN.test(roomId)) {
+    return new Response("Invalid room ID", { status: 400 });
+  }
+  const id = env.FORTLESS_ROOMS.idFromName(roomId);
+  return env.FORTLESS_ROOMS.get(id).fetch(request);
+}
 
 // =====================================================================
-// 既存: 集結着弾時刻管理 (RallyRoom) のロジック
+// 集結着弾時刻管理 (RallyRoom) のロジック
 // =====================================================================
 async function handleRallyRoom(request, env, roomId) {
   if (!ROOM_ID_PATTERN.test(roomId)) {
@@ -481,18 +495,18 @@ function isRally(rally) {
 
 
 // =====================================================================
-// 新規: 砦・要塞 行軍同期システム (FortlessRoom) のロジック
+// 新規: 砦・要塞 行軍同期システム (CommanderRoom) のロジック
 // =====================================================================
-async function handleFortlessRoom(request, env, roomId) {
+async function handleCommanderRoom(request, env, roomId) {
   // 合言葉はユーザーが任意に入力するため、厳密なハッシュチェックは省き文字数のみ制限
   if (!roomId || roomId.length > 64) {
     return new Response("Invalid room ID", { status: 400 });
   }
-  const id = env.FORTLESS_ROOMS.idFromName(roomId);
-  return env.FORTLESS_ROOMS.get(id).fetch(request);
+  const id = env.COMMANDER_ROOMS.idFromName(roomId);
+  return env.COMMANDER_ROOMS.get(id).fetch(request);
 }
 
-export class FortlessRoom {
+export class CommanderRoom {
   constructor(state, env) {
     this.state = state;
     // メモリ上でメンバーとセッションを管理

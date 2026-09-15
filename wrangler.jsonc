@@ -18,6 +18,10 @@
       {
         "name": "FORTLESS_ROOMS",
         "class_name": "FortlessRoom"
+      },
+      {
+        "name": "COMMANDER_ROOMS",
+        "class_name": "CommanderRoom"
       }
     ]
   },
@@ -29,6 +33,10 @@
     {
       "tag": "v2",
       "new_classes": ["FortlessRoom"]
+    },
+    {
+      "tag": "v3",
+      "new_classes": ["CommanderRoom"]
     }
   ],
   "assets": {
