@@ -76,6 +76,11 @@
     .close-room-button {
       width: auto; background-color: #b91c1c; margin-top: 15px;
     }
+    .timezone-control {
+      display: flex; align-items: center; gap: 8px; margin-bottom: 15px;
+      font-size: 0.9rem;
+    }
+    .timezone-control select { width: auto; padding: 6px 8px; }
   </style>
 </head>
 <body>
@@ -83,6 +88,13 @@
   <!-- メンバ用画面 -->
   <div id="member-view" class="container hidden">
     <h2>🎯 メンバ参加画面</h2>
+    <div class="timezone-control">
+      <label for="member-timezone">時刻表示</label>
+      <select id="member-timezone" onchange="changeTimezone(this.value)">
+        <option value="UTC">UTC</option>
+        <option value="JST">JST</option>
+      </select>
+    </div>
     <div class="countdown-box">
       <div id="member-status" class="status-text">状態: 未接続</div>
       <div id="member-countdown" class="countdown-time">--:--:--</div>
@@ -115,6 +127,13 @@
   <!-- 指示役用画面 -->
   <div id="commander-view" class="container hidden">
     <h2>👑 指示役画面</h2>
+    <div class="timezone-control">
+      <label for="commander-timezone">時刻表示</label>
+      <select id="commander-timezone" onchange="changeTimezone(this.value)">
+        <option value="UTC">UTC</option>
+        <option value="JST">JST</option>
+      </select>
+    </div>
     <div class="form-group" style="display: flex; gap: 10px;">
       <input type="text" id="cmd-room-id" placeholder="合言葉" style="flex: 1;">
       <button onclick="initCommanderRoom()" style="width: auto;">監視開始</button>
@@ -167,6 +186,7 @@
     let serverOffset = 0;
     let currentRoomId = null;
     let syncInterval = null;
+    let timezone = localStorage.getItem('rally_commander_timezone') || 'UTC';
 
     // メンバ用ステート
     let myState = { departure_time: null, target_time: null };
@@ -179,6 +199,7 @@
     } else {
       document.getElementById('member-view').classList.remove('hidden');
     }
+    document.getElementById(`${role}-timezone`).value = timezone;
 
     // --- ユーティリティ ---
     function getServerTime() {
@@ -188,9 +209,26 @@
     function formatTime(timestamp) {
       if (!timestamp) return '--:--:--';
       const d = new Date(timestamp);
-      return d.getHours().toString().padStart(2, '0') + ':' + 
-             d.getMinutes().toString().padStart(2, '0') + ':' + 
-             d.getSeconds().toString().padStart(2, '0');
+      const displayDate = timezone === 'JST' ? new Date(timestamp + 9 * 60 * 60 * 1000) : d;
+      const hours = displayDate.getUTCHours();
+      const minutes = displayDate.getUTCMinutes();
+      const seconds = displayDate.getUTCSeconds();
+      return hours.toString().padStart(2, '0') + ':' +
+             minutes.toString().padStart(2, '0') + ':' +
+             seconds.toString().padStart(2, '0');
+    }
+
+    function changeTimezone(value) {
+      timezone = value === 'JST' ? 'JST' : 'UTC';
+      localStorage.setItem('rally_commander_timezone', timezone);
+      document.getElementById('member-timezone').value = timezone;
+      document.getElementById('commander-timezone').value = timezone;
+      if (role === 'commander') {
+        updateCommanderTable(allMembers);
+      } else {
+        document.getElementById('member-departure').textContent = formatTime(myState.departure_time);
+        document.getElementById('member-arrival').textContent = formatTime(myState.target_time);
+      }
     }
 
     function formatCountdown(ms) {
@@ -349,10 +387,22 @@
       if (targetIds.length === 0) return alert("対象メンバを選択してください");
 
       // 今日の日付の指定時刻のタイムスタンプを作成
-      const d = new Date();
       const [hours, minutes, seconds] = timeInput.split(':');
-      d.setHours(hours, minutes, seconds || 0, 0);
-      const targetTime = d.getTime();
+      const now = new Date();
+      const numericHours = Number(hours);
+      const numericMinutes = Number(minutes);
+      const numericSeconds = Number(seconds || 0);
+      const displayNow = timezone === 'JST'
+        ? new Date(now.getTime() + 9 * 60 * 60 * 1000)
+        : now;
+      const targetTime = Date.UTC(
+        displayNow.getUTCFullYear(),
+        displayNow.getUTCMonth(),
+        displayNow.getUTCDate(),
+        numericHours,
+        numericMinutes,
+        numericSeconds,
+      ) - (timezone === 'JST' ? 9 * 60 * 60 * 1000 : 0);
 
       ws.send(JSON.stringify({ type: 'command_target', payload: { target_member_ids: targetIds, target_time: targetTime } }));
     }
