@@ -196,7 +196,13 @@ const INDEX_HTML = `<!DOCTYPE html>
             </div>
             <a href="WOS_rally_tracker.html" class="btn" target="_blank" rel="noopener noreferrer">ツールを開く</a>
         </div>
-
+        <div class="tool-card">
+            <div class="tool-card-content">
+                <h2>砦・要塞 行軍同期システム</h2>
+                <p>複数人で同時に施設へ着弾するための、ミリ秒単位のカウントダウンツールです。指示役が「合言葉」を決めて号令を出せます。</p>
+            </div>
+            <a href="WOS_fortless_sync.html" class="btn" target="_blank" rel="noopener noreferrer">ツールを開く</a>
+        </div>
 
     </main>
 
@@ -215,14 +221,17 @@ export default {
     const url = new URL(request.url);
     const pathname = url.pathname;
 
-    // 1. WebSocket接続のみをDurable Objectsへ転送（Upgradeヘッダー確認を追加）
-    if (
-      (pathname === "/rally-room" || pathname === "/fortless-room") &&
-      url.searchParams.has("room") &&
-      request.headers.get("Upgrade")?.toLowerCase() === "websocket"
-    ) {
+    // 1. WebSocket接続のルーティング分離
+    if (url.searchParams.has("room") && request.headers.get("Upgrade")?.toLowerCase() === "websocket") {
       const roomId = url.searchParams.get("room");
-      return handleRallyRoom(request, env, roomId);
+      
+      if (pathname === "/rally-room") {
+        return handleRallyRoom(request, env, roomId);
+      }
+      
+      if (pathname === "/fortless-room") {
+        return handleFortlessRoom(request, env, roomId);
+      }
     }
 
     if (request.method !== "GET" && request.method !== "HEAD") {
@@ -236,17 +245,16 @@ export default {
       });
     }
 
-    // 3. getAssetFromKV を廃止し、[assets] 機能 (env.ASSETS.fetch) で静的ファイルを配信
+    // 3. [assets] 機能 (env.ASSETS.fetch) で静的ファイルを配信
     try {
       let response = await env.ASSETS.fetch(request);
       
-      // 拡張子なし（例: /WOS_sunfire_timer）でのアクセスを .html に補完して再取得
+      // 拡張子なしでのアクセスを .html に補完して再取得
       if (response.status === 404 && !pathname.includes(".")) {
         const htmlRequest = new Request(new URL(`${pathname}.html`, request.url), request);
         response = await env.ASSETS.fetch(htmlRequest);
       }
 
-      // ファイルが見つかった場合はそのまま返す
       if (response.status !== 404) {
         return response;
       }
@@ -263,15 +271,13 @@ export default {
 };
 
 
+// =====================================================================
+// 既存: 集結着弾時刻管理 (RallyRoom) のロジック
+// =====================================================================
 async function handleRallyRoom(request, env, roomId) {
   if (!ROOM_ID_PATTERN.test(roomId)) {
     return new Response("Invalid room ID", { status: 400 });
   }
-
-  if (request.headers.get("Upgrade") !== "websocket") {
-    return new Response("Expected WebSocket upgrade", { status: 426 });
-  }
-
   const id = env.RALLY_ROOMS.idFromName(roomId);
   return env.RALLY_ROOMS.get(id).fetch(request);
 }
@@ -310,9 +316,7 @@ export class RallyRoom {
     } catch {
       return this.sendError(webSocket, "Invalid message");
     }
-    if (message.type === "ping") {
-      return; 
-    }
+    if (message.type === "ping") return; 
 
     if (message.type === "update-state") {
       if (message.state) {
@@ -479,4 +483,153 @@ function isRally(rally) {
     Number.isFinite(rally.arrivalTimeMs) &&
     ["launch", "arrival"].includes(rally.calcMode)
   );
+}
+
+
+// =====================================================================
+// 新規: 砦・要塞 行軍同期システム (FortlessRoom) のロジック
+// =====================================================================
+async function handleFortlessRoom(request, env, roomId) {
+  // 合言葉はユーザーが任意に入力するため、厳密なハッシュチェックは省き文字数のみ制限
+  if (!roomId || roomId.length > 64) {
+    return new Response("Invalid room ID", { status: 400 });
+  }
+  const id = env.FORTLESS_ROOMS.idFromName(roomId);
+  return env.FORTLESS_ROOMS.get(id).fetch(request);
+}
+
+export class FortlessRoom {
+  constructor(state, env) {
+    this.state = state;
+    // メモリ上でメンバーとセッションを管理
+    this.members = new Map();
+    this.sessions = [];
+  }
+
+  async fetch(request) {
+    const pair = new WebSocketPair();
+    const [client, server] = Object.values(pair);
+
+    server.accept();
+    const session = { ws: server, role: 'unknown', member_id: null };
+    this.sessions.push(session);
+
+    server.addEventListener("message", (event) => this.handleMessage(session, event));
+    
+    // 切断時はセッションリストから除外するが、モバイルのバックグラウンド停止からの復帰を考慮し
+    // membersデータ（指示された到着時刻など）は保持しておく。
+    // 再接続時に同じ member_id で join されれば状態を引き継げる。
+    server.addEventListener("close", () => {
+      this.sessions = this.sessions.filter(s => s !== session);
+    });
+    server.addEventListener("error", () => {
+      this.sessions = this.sessions.filter(s => s !== session);
+    });
+
+    return new Response(null, { status: 101, webSocket: client });
+  }
+
+  handleMessage(session, event) {
+    let data;
+    try {
+      data = JSON.parse(event.data);
+    } catch {
+      return;
+    }
+
+    const { type, payload } = data;
+    const now = Date.now();
+
+    switch (type) {
+      case 'ping':
+        session.ws.send(JSON.stringify({
+          type: 'pong',
+          payload: {
+            client_time: payload.client_time,
+            server_time: now
+          }
+        }));
+        break;
+
+      case 'join':
+        session.role = payload.role;
+        if (payload.role === 'member') {
+          session.member_id = payload.member_id;
+          
+          // 既存データがあればマージ、なければ新規作成
+          const existing = this.members.get(payload.member_id) || {
+            target_time: null,
+            departure_time: null
+          };
+          
+          this.members.set(payload.member_id, {
+            member_id: payload.member_id,
+            name: payload.name,
+            march_time: payload.march_time,
+            target_time: existing.target_time,
+            departure_time: existing.departure_time
+          });
+        }
+        this.broadcastState();
+        break;
+
+      case 'command_ready':
+        if (session.role !== 'commander') return;
+        
+        let maxMarchTime = 0;
+        for (const id of payload.target_member_ids) {
+          const m = this.members.get(id);
+          if (m && m.march_time > maxMarchTime) {
+            maxMarchTime = m.march_time;
+          }
+        }
+        
+        const targetTimeReady = now + 3000 + (maxMarchTime * 1000);
+        for (const id of payload.target_member_ids) {
+          const m = this.members.get(id);
+          if (m) {
+            m.target_time = targetTimeReady;
+            m.departure_time = targetTimeReady - (m.march_time * 1000);
+          }
+        }
+        this.broadcastState();
+        break;
+
+      case 'command_target':
+        if (session.role !== 'commander') return;
+        
+        const targetTime = payload.target_time;
+        for (const id of payload.target_member_ids) {
+          const m = this.members.get(id);
+          if (m) {
+            m.target_time = targetTime;
+            m.departure_time = targetTime - (m.march_time * 1000);
+          }
+        }
+        this.broadcastState();
+        break;
+    }
+  }
+
+  broadcastState() {
+    const allMembers = Array.from(this.members.values());
+    for (const session of this.sessions) {
+      if (session.ws.readyState !== 1) continue; // WebSocket.OPEN か確認
+      
+      if (session.role === 'commander') {
+        session.ws.send(JSON.stringify({
+          type: 'state_update',
+          payload: { members: allMembers }
+        }));
+      } else if (session.role === 'member' && session.member_id) {
+        const myData = this.members.get(session.member_id);
+        if (myData) {
+          session.ws.send(JSON.stringify({
+            type: 'state_update',
+            payload: myData
+          }));
+        }
+      }
+    }
+  }
 }

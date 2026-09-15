@@ -6,9 +6,23 @@ compatibility_date = "2026-08-30"
 name = "RALLY_ROOMS"
 class_name = "RallyRoom"
 
+# ==========================================
+# 砦・要塞 行軍同期用のバインディング
+# ==========================================
+[[durable_objects.bindings]]
+name = "FORTLESS_ROOMS"
+class_name = "FortlessRoom"
+
 [[migrations]]
 tag = "v1"
 new_sqlite_classes = ["RallyRoom"]
+
+# ==========================================
+# 新しいDOクラスを登録するためのマイグレーション
+# ==========================================
+[[migrations]]
+tag = "v2"
+new_classes = ["FortlessRoom"]
 
 [env.production]
 vars = { ENVIRONMENT = "production" }
