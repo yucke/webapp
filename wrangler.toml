@@ -21,7 +21,7 @@ class_name = "CommanderRoom"
 # 新しいDOクラスを登録するためのマイグレーション
 # ==========================================
 [[migrations]]
-tag = "v2"
+tag = "v1"
 new_sqlite_classes = ["RallyRoom", "FortlessRoom", "CommanderRoom"]
 
 [env.production]
