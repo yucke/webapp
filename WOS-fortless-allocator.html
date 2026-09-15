@@ -681,6 +681,7 @@ async function connectWebSocket() {
 
   roomSocket.addEventListener('open', () => {
     updateRoomStatus('同期中', 'connected');
+    roomSocket.send(JSON.stringify({ type: 'get-state' }));
     if (pingInterval) clearInterval(pingInterval);
     pingInterval = setInterval(() => {
       if (roomSocket && roomSocket.readyState === WebSocket.OPEN) {
@@ -745,9 +746,11 @@ function sendStateToServer() {
   if (roomSocket && roomSocket.readyState === WebSocket.OPEN) {
     roomSocket.send(JSON.stringify({
       type: 'update-state',
-      state: {
-        status: state.status,
-        alliances: state.alliances
+      payload: {
+        state: {
+          status: state.status,
+          alliances: state.alliances
+        }
       }
     }));
   }

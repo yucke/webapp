@@ -141,7 +141,7 @@
 
   <script>
     // --- 構成設定 ---
-    const WORKER_URL = "https://webapp.kiironoangel.workers.dev/fortless-room"; // ★ここをDOのURLに変更
+    const WORKER_URL = "https://webapp.kiironoangel.workers.dev/rally-room";
     
     // --- 状態管理 ---
     const urlParams = new URLSearchParams(window.location.search);
@@ -188,12 +188,12 @@
     }
 
     // --- WebSocket 通信管理 ---
-    function connectWebSocket(roomId) {
+    async function connectWebSocket(roomId) {
       if (ws) ws.close();
       currentRoomId = roomId;
       const socketUrl = new URL(WORKER_URL);
       socketUrl.protocol = socketUrl.protocol === 'https:' ? 'wss:' : 'ws:';
-      socketUrl.searchParams.set('room', roomId);
+      socketUrl.searchParams.set('room', await hashRoomId(roomId));
       ws = new WebSocket(socketUrl.toString());
 
       ws.onopen = () => {
@@ -231,6 +231,14 @@
       ws.onclose = () => {
         console.log("WebSocket切断");
       };
+    }
+
+    async function hashRoomId(roomId) {
+      const data = new TextEncoder().encode(roomId);
+      const hash = await crypto.subtle.digest('SHA-256', data);
+      return [...new Uint8Array(hash)]
+        .map(byte => byte.toString(16).padStart(2, '0'))
+        .join('');
     }
 
     function sendPing() {

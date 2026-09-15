@@ -498,6 +498,7 @@ export class FortlessRoom {
     // メモリ上でメンバーとセッションを管理
     this.members = new Map();
     this.sessions = [];
+    this.allocatorState = null;
   }
 
   async fetch(request) {
@@ -535,6 +536,27 @@ export class FortlessRoom {
     const now = Date.now();
 
     switch (type) {
+      case 'get-state':
+        if (this.allocatorState) {
+          session.ws.send(JSON.stringify({ type: 'state', ...this.allocatorState }));
+        }
+        break;
+
+      case 'update-state':
+        if (!payload?.state || typeof payload.state.status !== 'string' || !Array.isArray(payload.state.alliances)) {
+          return;
+        }
+        this.allocatorState = {
+          status: payload.state.status,
+          alliances: payload.state.alliances
+        };
+        for (const currentSession of this.sessions) {
+          if (currentSession.ws.readyState === 1) {
+            currentSession.ws.send(JSON.stringify({ type: 'state', ...this.allocatorState }));
+          }
+        }
+        break;
+
       case 'ping':
         session.ws.send(JSON.stringify({
           type: 'pong',
