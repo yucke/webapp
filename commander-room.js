@@ -142,6 +142,14 @@ export class CommanderRoom {
           if (!member) continue;
           member.target_time = null;
           member.departure_time = null;
+          for (const memberSession of this.sessions) {
+            if (memberSession.role === 'member' && memberSession.member_id === id && memberSession.ws.readyState === 1) {
+              memberSession.ws.send(JSON.stringify({
+                type: 'member-reset',
+                payload: { departure_time: null, target_time: null },
+              }));
+            }
+          }
         }
         this.broadcastState();
         break;

@@ -297,6 +297,15 @@
           }
         }
 
+        if (data.type === 'member-reset' && role === 'member') {
+          myState = { departure_time: null, target_time: null };
+          document.getElementById('member-departure').textContent = '未定';
+          document.getElementById('member-arrival').textContent = '未定';
+          document.getElementById('member-countdown').textContent = '--:--:--';
+          document.getElementById('member-status').className = 'status-text';
+          document.getElementById('member-status').textContent = '状態: 指示待ち';
+        }
+
         if (data.type === 'room-closed') {
           if (syncInterval) clearInterval(syncInterval);
           syncInterval = null;
