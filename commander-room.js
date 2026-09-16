@@ -119,13 +119,13 @@ export class CommanderRoom {
 
         const departureTimeReady = now + 5000;
         const marchStartTimeReady = departureTimeReady + rallyMinutesReady * 60 * 1000;
-        const targetTimeReady = marchStartTimeReady + (maxMarchTime * 1000);
         for (const id of payload.target_member_ids) {
           const member = this.members.get(id);
           if (member) {
+            const targetTime = marchStartTimeReady + (Number(member.march_time) || 0) * 1000;
             member.rally_minutes = rallyMinutesReady;
             member.march_start_time = marchStartTimeReady;
-            member.target_time = targetTimeReady;
+            member.target_time = targetTime;
             member.departure_time = departureTimeReady;
           }
         }

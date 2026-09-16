@@ -651,11 +651,9 @@
           statusEl.className = 'status-text status-waiting';
           statusEl.textContent = `集結中 (${myState.rally_minutes || 0}分)`;
         } else if (now < myState.target_time) {
-          display.textContent = "行軍中！";
-          display.classList.remove('countdown-orange', 'countdown-red');
-          display.classList.add('countdown-green');
+          setCountdownDisplay(display, myState.target_time - now);
           statusEl.className = 'status-text status-marching';
-          statusEl.textContent = '状態: 行軍中';
+          statusEl.textContent = '状態: 行軍中（到着まで）';
         } else {
           display.textContent = "着弾！";
           display.classList.remove('countdown-orange', 'countdown-red');
