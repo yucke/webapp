@@ -241,7 +241,11 @@
     // --- 状態管理 ---
     const urlParams = new URLSearchParams(window.location.search);
     const role = urlParams.get('role') === 'commander' ? 'commander' : 'member';
-    const myMemberId = "member-" + Math.floor(Math.random() * 100000);
+    const myMemberId = localStorage.getItem('rally_commander_member_id') || (() => {
+      const memberId = `member-${crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).slice(2)}`;
+      localStorage.setItem('rally_commander_member_id', memberId);
+      return memberId;
+    })();
     
     let ws = null;
     let serverOffset = 0;
@@ -475,7 +479,10 @@
           resetCountdownDisplay(document.getElementById('member-countdown'));
           document.getElementById('member-departure').textContent = '未定';
           document.getElementById('member-arrival').textContent = '未定';
-          document.getElementById('member-settings').open = true;
+          localStorage.removeItem('rally_commander_room');
+          localStorage.removeItem('rally_commander_command_room');
+          const memberSettings = document.getElementById('member-settings');
+          if (memberSettings) memberSettings.open = true;
         }
       };
 
@@ -514,6 +521,9 @@
       const roomId = document.getElementById('room-id').value;
       const name = document.getElementById('member-name').value;
       const marchTime = parseInt(document.getElementById('march-time').value, 10);
+      localStorage.setItem('rally_commander_room', roomId);
+      localStorage.setItem('rally_commander_name', name);
+      localStorage.setItem('rally_commander_march_time', String(marchTime));
 
       // 初回接続またはルーム変更時
       if (currentRoomId !== roomId || !ws || ws.readyState !== WebSocket.OPEN) {
@@ -545,6 +555,7 @@
     function initCommanderRoom() {
       const roomId = document.getElementById('cmd-room-id').value;
       if (!roomId) return alert("合言葉を入力してください");
+      localStorage.setItem('rally_commander_command_room', roomId);
       connectWebSocket(roomId);
       document.getElementById('close-room-button').classList.remove('hidden');
     }
@@ -794,7 +805,26 @@
       requestAnimationFrame(renderLoop);
     }
 
+    function restoreSavedConnection() {
+      if (role === 'member') {
+        const roomId = localStorage.getItem('rally_commander_room');
+        const name = localStorage.getItem('rally_commander_name');
+        const marchTime = localStorage.getItem('rally_commander_march_time');
+        if (!roomId || !name || !marchTime) return;
+        document.getElementById('room-id').value = roomId;
+        document.getElementById('member-name').value = name;
+        document.getElementById('march-time').value = marchTime;
+        submitMemberData();
+      } else {
+        const roomId = localStorage.getItem('rally_commander_command_room');
+        if (!roomId) return;
+        document.getElementById('cmd-room-id').value = roomId;
+        initCommanderRoom();
+      }
+    }
+
     // 描画ループ開始
+    restoreSavedConnection();
     requestAnimationFrame(renderLoop);
 
   </script>

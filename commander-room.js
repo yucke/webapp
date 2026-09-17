@@ -11,9 +11,11 @@ export class CommanderRoom {
     this.state = state;
     this.members = new Map();
     this.sessions = [];
+    this.membersLoaded = false;
   }
 
   async fetch(request) {
+    await this.loadMembers();
     const pair = new WebSocketPair();
     const [client, server] = Object.values(pair);
 
@@ -33,6 +35,7 @@ export class CommanderRoom {
   }
 
   async handleMessage(session, event) {
+    await this.loadMembers();
     let data;
     try {
       data = JSON.parse(event.data);
@@ -98,6 +101,7 @@ export class CommanderRoom {
             target_time: existing.target_time,
             departure_time: existing.departure_time
           });
+          await this.saveMembers();
         }
         this.broadcastState();
         break;
@@ -118,6 +122,7 @@ export class CommanderRoom {
           target_time: null,
           departure_time: null,
         });
+        await this.saveMembers();
         this.broadcastState();
         break;
 
@@ -153,6 +158,7 @@ export class CommanderRoom {
             member.departure_time = memberDepartureTime;
           }
         }
+        await this.saveMembers();
         this.broadcastState();
         break;
 
@@ -189,6 +195,7 @@ export class CommanderRoom {
             member.departure_time = marchStartTime;
           }
         }
+        await this.saveMembers();
         this.broadcastState();
         break;
 
@@ -211,6 +218,7 @@ export class CommanderRoom {
             }
           }
         }
+        await this.saveMembers();
         this.broadcastState();
         break;
 
@@ -233,6 +241,19 @@ export class CommanderRoom {
     }
     this.sessions = [];
     this.members.clear();
+  }
+
+  async loadMembers() {
+    if (this.membersLoaded) return;
+    const storedMembers = await this.state.storage.get('commanderMembers');
+    if (Array.isArray(storedMembers)) {
+      this.members = new Map(storedMembers.map((member) => [member.member_id, member]));
+    }
+    this.membersLoaded = true;
+  }
+
+  async saveMembers() {
+    await this.state.storage.put('commanderMembers', Array.from(this.members.values()));
   }
 
   broadcastState() {
