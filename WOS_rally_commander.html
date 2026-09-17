@@ -621,27 +621,17 @@
     }
 
     function getMembersByStatus(status) {
-      const now = getServerTime();
+      const statusLabels = {
+        'instruction-waiting': '指示待ち',
+        waiting: '待機中',
+        rally: '集結中',
+        marching: '行軍中',
+        arrived: '到着',
+      };
+      const targetStatus = statusLabels[status];
       return allMembers.filter(member => {
-        const departureTime = Number(member.departure_time);
-        const rallyStartTime = Number(member.rally_start_time);
-        const marchStartTime = Number(member.march_start_time);
-        const targetTime = Number(member.target_time);
-        const hasSchedule = Number.isFinite(departureTime) && Number.isFinite(targetTime);
-
-        if (status === 'instruction-waiting') return !hasSchedule;
-        if (!hasSchedule) return false;
-        if (status === 'waiting') return now < departureTime;
-        if (status === 'rally') {
-          return now >= departureTime &&
-            (!Number.isFinite(marchStartTime) || now < marchStartTime);
-        }
-        if (status === 'marching') {
-          return Number.isFinite(marchStartTime) &&
-            now >= marchStartTime && now < targetTime;
-        }
-        if (status === 'arrived') return now >= targetTime;
-        return false;
+        const row = document.getElementById(`row-${member.member_id}`);
+        return row?.dataset.status === targetStatus;
       });
     }
 
@@ -729,6 +719,7 @@
         const isChecked = checkedIds.has(member.member_id) ? 'checked' : '';
         const tr = document.createElement('tr');
         tr.id = `row-${member.member_id}`;
+        tr.dataset.status = '指示待ち';
         
         tr.innerHTML = `
           <td><input type="checkbox" class="member-checkbox" value="${member.member_id}" ${isChecked} onchange="updateTargetTimeMinimum(); updateSelectionButtonLabels()"></td>
@@ -776,7 +767,6 @@
       } 
       else if (role === 'commander') {
         updateTargetTimeMinimum();
-        updateSelectionButtonLabels();
         allMembers.forEach(member => {
           const tr = document.getElementById(`row-${member.member_id}`);
           const statusEl = document.getElementById(`status-${member.member_id}`);
@@ -785,6 +775,7 @@
 
           if (!member.target_time || !member.departure_time) {
             tr.className = '';
+            tr.dataset.status = '指示待ち';
             statusEl.textContent = '指示待ち';
             countdownEl.textContent = '--';
             return;
@@ -792,22 +783,27 @@
 
           if (now < member.departure_time) {
             tr.className = 'row-waiting';
+            tr.dataset.status = '待機中';
             statusEl.textContent = '待機中';
             countdownEl.textContent = Math.ceil((member.departure_time - now) / 1000) + '秒';
           } else if (member.march_start_time && now < member.march_start_time) {
             tr.className = 'row-waiting';
+            tr.dataset.status = '集結中';
             statusEl.textContent = '集結中';
             countdownEl.textContent = Math.ceil((member.march_start_time - now) / 1000) + '秒';
           } else if (now < member.target_time) {
             tr.className = 'row-marching';
+            tr.dataset.status = '行軍中';
             statusEl.textContent = '行軍中';
             countdownEl.textContent = '出発済';
           } else {
             tr.className = 'row-arrived';
+            tr.dataset.status = '到着';
             statusEl.textContent = '到着';
             countdownEl.textContent = '着弾';
           }
         });
+        updateSelectionButtonLabels();
       }
 
       requestAnimationFrame(renderLoop);
