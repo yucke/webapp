@@ -159,9 +159,9 @@
     </div>
     <div class="form-group" style="display: flex; gap: 10px;">
       <input type="text" id="cmd-room-id" placeholder="合言葉" style="flex: 1;">
-      <button onclick="initCommanderRoom()" style="width: auto;">監視開始</button>
+      <button onclick="initCommanderRoom()" style="width: auto;">共有開始</button>
     </div>
-    <button id="close-room-button" class="close-room-button hidden" onclick="closeCommanderRoom()">ルームを閉じる</button>
+    <button id="close-room-button" class="close-room-button hidden" onclick="closeCommanderRoom()">共有終了</button>
 
     <div class="table-responsive">
       <div class="member-tools">
@@ -185,9 +185,9 @@
         </div>
       </div>
       <div class="member-selection-actions" aria-label="メンバ一括選択">
-        <button type="button" onclick="selectAllMembers()">全員選択</button>
-        <button type="button" onclick="selectAvailableMembers()">待機中・行軍中を除く全員選択</button>
-        <button type="button" onclick="selectArrivedMembers()">到着済み全員選択</button>
+        <button type="button" id="select-all-members-button" onclick="toggleAllMembers()">全員選択</button>
+        <button type="button" id="select-available-members-button" onclick="toggleAvailableMembers()">待機中・行軍中を除く全員選択</button>
+        <button type="button" id="select-arrived-members-button" onclick="toggleArrivedMembers()">到着済み全員選択</button>
         <button type="button" onclick="resetSelectedMembers()">選択メンバを指示待ちに戻す</button>
       </div>
       <table id="members-table">
@@ -596,28 +596,59 @@
         checkbox.checked = selectedIds.has(checkbox.value);
       });
       updateTargetTimeMinimum();
+      updateSelectionButtonLabels();
     }
 
-    function selectAllMembers() {
-      setSelectedMembers(allMembers.map(member => member.member_id));
+    function toggleMembers(memberIds) {
+      const selectedIds = new Set(getSelectedMemberIds());
+      const allSelected = memberIds.length > 0 && memberIds.every(id => selectedIds.has(id));
+      memberIds.forEach(id => {
+        if (allSelected) selectedIds.delete(id);
+        else selectedIds.add(id);
+      });
+      setSelectedMembers([...selectedIds]);
     }
 
-    function selectAvailableMembers() {
+    function getAvailableMembers() {
       const now = getServerTime();
-      const availableMembers = allMembers.filter(member => {
+      return allMembers.filter(member => {
         const isAssigned = Number.isFinite(member.departure_time) && Number.isFinite(member.target_time);
         const isInProgress = isAssigned && now < member.target_time;
         return !isInProgress;
       });
-      setSelectedMembers(availableMembers.map(member => member.member_id));
     }
 
-    function selectArrivedMembers() {
+    function getArrivedMembers() {
       const now = getServerTime();
-      const arrivedMembers = allMembers.filter(member =>
+      return allMembers.filter(member =>
         Number.isFinite(member.target_time) && now >= member.target_time,
       );
-      setSelectedMembers(arrivedMembers.map(member => member.member_id));
+    }
+
+    function toggleAllMembers() {
+      toggleMembers(allMembers.map(member => member.member_id));
+    }
+
+    function toggleAvailableMembers() {
+      toggleMembers(getAvailableMembers().map(member => member.member_id));
+    }
+
+    function toggleArrivedMembers() {
+      toggleMembers(getArrivedMembers().map(member => member.member_id));
+    }
+
+    function updateSelectionButtonLabels() {
+      const selectedIds = new Set(getSelectedMemberIds());
+      const updateLabel = (buttonId, members, label) => {
+        const button = document.getElementById(buttonId);
+        if (!button) return;
+        const ids = members.map(member => member.member_id);
+        const allSelected = ids.length > 0 && ids.every(id => selectedIds.has(id));
+        button.textContent = allSelected ? `${label}全解除` : `${label}全選択`;
+      };
+      updateLabel('select-all-members-button', allMembers, '全員');
+      updateLabel('select-available-members-button', getAvailableMembers(), '待機中・行軍中を除く全員');
+      updateLabel('select-arrived-members-button', getArrivedMembers(), '到着済み全員');
     }
 
     function resetSelectedMembers() {
@@ -681,7 +712,7 @@
         tr.id = `row-${member.member_id}`;
         
         tr.innerHTML = `
-          <td><input type="checkbox" class="member-checkbox" value="${member.member_id}" ${isChecked} onchange="updateTargetTimeMinimum()"></td>
+          <td><input type="checkbox" class="member-checkbox" value="${member.member_id}" ${isChecked} onchange="updateTargetTimeMinimum(); updateSelectionButtonLabels()"></td>
           <td>${member.name}</td>
           <td id="status-${member.member_id}">指示待ち</td>
           <td>${member.march_time}秒</td>
@@ -692,6 +723,7 @@
         tbody.appendChild(tr);
       });
       updateTargetTimeMinimum();
+      updateSelectionButtonLabels();
     }
 
     // --- 描画ループ (毎フレーム更新) ---
@@ -725,6 +757,7 @@
       } 
       else if (role === 'commander') {
         updateTargetTimeMinimum();
+        updateSelectionButtonLabels();
         allMembers.forEach(member => {
           const tr = document.getElementById(`row-${member.member_id}`);
           const statusEl = document.getElementById(`status-${member.member_id}`);
