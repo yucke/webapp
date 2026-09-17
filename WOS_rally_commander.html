@@ -794,7 +794,7 @@
             tr.className = 'row-waiting';
             tr.dataset.status = '集結中';
             statusEl.textContent = '集結中';
-            countdownEl.textContent = Math.ceil((member.march_start_time - now) / 1000) + '秒';
+            countdownEl.textContent = '集結中';
           } else if (now < member.target_time) {
             tr.className = 'row-marching';
             tr.dataset.status = '行軍中';
