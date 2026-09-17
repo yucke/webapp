@@ -185,12 +185,12 @@
         </div>
       </div>
       <div class="member-selection-actions" aria-label="メンバ一括選択">
-        <button type="button" id="select-all-members-button" onclick="toggleAllMembers()">全員☑</button>
-        <button type="button" id="select-waiting-members-button" onclick="toggleStatusMembers('waiting')">待機中全員☑</button>
-        <button type="button" id="select-rally-members-button" onclick="toggleStatusMembers('rally')">集結中全員☑</button>
-        <button type="button" id="select-marching-members-button" onclick="toggleStatusMembers('marching')">行軍中全員☑</button>
-        <button type="button" id="select-arrived-members-button" onclick="toggleStatusMembers('arrived')">到着全員☑</button>
-        <button type="button" id="select-instruction-waiting-members-button" onclick="toggleStatusMembers('instruction-waiting')">指示待ち全員☑</button>
+        <button type="button" id="select-all-members-button" onclick="toggleAllMembers()">全員選択</button>
+        <button type="button" id="select-waiting-members-button" onclick="toggleStatusMembers('waiting')">待機中全員選択</button>
+        <button type="button" id="select-rally-members-button" onclick="toggleStatusMembers('rally')">集結中全員選択</button>
+        <button type="button" id="select-marching-members-button" onclick="toggleStatusMembers('marching')">行軍中全員選択</button>
+        <button type="button" id="select-arrived-members-button" onclick="toggleStatusMembers('arrived')">到着全員選択</button>
+        <button type="button" id="select-instruction-waiting-members-button" onclick="toggleStatusMembers('instruction-waiting')">指示待ち全員選択</button>
         <button type="button" onclick="resetSelectedMembers()">選択メンバを指示待ちに戻す</button>
       </div>
       <table id="members-table">
@@ -626,19 +626,17 @@
     function getMembersByStatus(status) {
       const now = getServerTime();
       return allMembers.filter(member => {
-        const hasSchedule = Number.isFinite(member.departure_time) && Number.isFinite(member.target_time);
-        if (status === 'instruction-waiting') return !hasSchedule;
-        if (!hasSchedule) return false;
-        if (status === 'waiting') return now < member.departure_time;
-        if (status === 'rally') {
-          return now >= member.departure_time && member.march_start_time && now < member.march_start_time;
-        }
-        if (status === 'marching') {
-          return member.march_start_time && now >= member.march_start_time && now < member.target_time;
-        }
-        if (status === 'arrived') return now >= member.target_time;
-        return false;
+        const isAssigned = Number.isFinite(member.departure_time) && Number.isFinite(member.target_time);
+        const isInProgress = isAssigned && now < member.target_time;
+        return !isInProgress;
       });
+    }
+
+    function getArrivedMembers() {
+      const now = getServerTime();
+      return allMembers.filter(member =>
+        Number.isFinite(member.target_time) && now >= member.target_time,
+      );
     }
 
     function toggleAllMembers() {
@@ -656,13 +654,13 @@
         if (!button) return;
         const ids = members.map(member => member.member_id);
         const allSelected = ids.length > 0 && ids.every(id => selectedIds.has(id));
-        button.textContent = allSelected ? `${label}☐` : `${label}☑`;
+        button.textContent = allSelected ? `${label}全解除` : `${label}全選択`;
       };
       updateLabel('select-all-members-button', allMembers, '全員');
-      updateLabel('select-waiting-members-button', getMembersByStatus('waiting'), '待機中全員');
-      updateLabel('select-rally-members-button', getMembersByStatus('rally'), '集結中全員');
-      updateLabel('select-marching-members-button', getMembersByStatus('marching'), '行軍中全員');
-      updateLabel('select-arrived-members-button', getMembersByStatus('arrived'), '到着全員');
+      updateLabel('select-waiting-members-button', getMembersByStatus('waiting'), '待機中');
+      updateLabel('select-rally-members-button', getMembersByStatus('rally'), '集結中');
+      updateLabel('select-marching-members-button', getMembersByStatus('marching'), '行軍中');
+      updateLabel('select-arrived-members-button', getMembersByStatus('arrived'), '到着');
       updateLabel('select-instruction-waiting-members-button', getMembersByStatus('instruction-waiting'), '指示待ち全員');
     }
 
