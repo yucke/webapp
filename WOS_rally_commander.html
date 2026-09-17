@@ -651,7 +651,7 @@
         if (!button) return;
         const ids = members.map(member => member.member_id);
         const allSelected = ids.length > 0 && ids.every(id => selectedIds.has(id));
-        button.textContent = allSelected ? `${label}全解除` : `${label}全選択`;
+        button.textContent = allSelected ? `${label}☐` : `${label}☑`;
       };
       updateLabel('select-all-members-button', allMembers, '全員');
       updateLabel('select-waiting-members-button', getMembersByStatus('waiting'), '待機中');
