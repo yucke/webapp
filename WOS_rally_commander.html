@@ -750,9 +750,11 @@
           statusEl.className = 'status-text status-waiting';
           statusEl.textContent = '状態: 出発待ち';
         } else if (myState.march_start_time && now < myState.march_start_time) {
-          setCountdownDisplay(display, myState.march_start_time - now);
+          display.textContent = '集結中';
+          display.classList.remove('countdown-orange', 'countdown-red');
+          display.classList.add('countdown-green');
           statusEl.className = 'status-text status-waiting';
-          statusEl.textContent = `集結中（${myState.rally_minutes || 0}分）`;
+          statusEl.textContent = `状態: 集結中（${myState.rally_minutes || 0}分）`;
         } else if (now < myState.target_time) {
           display.textContent = '出発済';
           display.classList.remove('countdown-orange', 'countdown-red');
