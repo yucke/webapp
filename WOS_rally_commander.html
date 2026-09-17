@@ -623,17 +623,26 @@
     function getMembersByStatus(status) {
       const now = getServerTime();
       return allMembers.filter(member => {
-        const isAssigned = Number.isFinite(member.departure_time) && Number.isFinite(member.target_time);
-        const isInProgress = isAssigned && now < member.target_time;
-        return !isInProgress;
-      });
-    }
+        const departureTime = Number(member.departure_time);
+        const rallyStartTime = Number(member.rally_start_time);
+        const marchStartTime = Number(member.march_start_time);
+        const targetTime = Number(member.target_time);
+        const hasSchedule = Number.isFinite(departureTime) && Number.isFinite(targetTime);
 
-    function getArrivedMembers() {
-      const now = getServerTime();
-      return allMembers.filter(member =>
-        Number.isFinite(member.target_time) && now >= member.target_time,
-      );
+        if (status === 'instruction-waiting') return !hasSchedule;
+        if (!hasSchedule) return false;
+        if (status === 'waiting') return now < departureTime;
+        if (status === 'rally') {
+          return now >= departureTime &&
+            (!Number.isFinite(marchStartTime) || now < marchStartTime);
+        }
+        if (status === 'marching') {
+          return Number.isFinite(marchStartTime) &&
+            now >= marchStartTime && now < targetTime;
+        }
+        if (status === 'arrived') return now >= targetTime;
+        return false;
+      });
     }
 
     function toggleAllMembers() {
