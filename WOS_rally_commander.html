@@ -98,6 +98,8 @@
     }
     .radio-group { display: flex; gap: 10px; flex-wrap: wrap; }
     .radio-option { display: inline-flex; align-items: center; gap: 4px; font-weight: normal; }
+    .sortable-header { cursor: pointer; user-select: none; }
+    .sortable-header:hover { background-color: #eef2ff; }
     .member-tools { display: flex; gap: 10px; flex-wrap: wrap; align-items: end; margin-bottom: 12px; }
     .member-tools .form-group { margin-bottom: 0; }
     .member-tools input, .member-tools select { width: auto; }
@@ -174,22 +176,13 @@
           <input type="number" id="manual-member-march-time" min="1" placeholder="秒">
         </div>
         <button type="button" onclick="addManualMember()" style="width: auto;">メンバを追加</button>
-        <div class="form-group">
-          <label for="member-sort">並び順</label>
-          <select id="member-sort" onchange="sortMembers(this.value)">
-            <option value="name">名前順</option>
-            <option value="march-time">行軍時間順</option>
-            <option value="arrival-time">到着時間順</option>
-            <option value="departure-time">出発時間順</option>
-          </select>
-        </div>
       </div>
       <div class="member-selection-actions" aria-label="メンバ一括選択">
-        <button type="button" id="select-all-members-button" onclick="toggleAllMembers()">全員選択</button>
-        <button type="button" id="select-waiting-members-button" onclick="toggleStatusMembers('waiting')">待機中全員選択</button>
-        <button type="button" id="select-rally-members-button" onclick="toggleStatusMembers('rally')">集結中全員選択</button>
-        <button type="button" id="select-marching-members-button" onclick="toggleStatusMembers('marching')">行軍中全員選択</button>
-        <button type="button" id="select-arrived-members-button" onclick="toggleStatusMembers('arrived')">到着全員選択</button>
+        <button type="button" id="select-all-members-button" onclick="toggleAllMembers()">全員☑</button>
+        <button type="button" id="select-waiting-members-button" onclick="toggleStatusMembers('waiting')">待機中☑</button>
+        <button type="button" id="select-rally-members-button" onclick="toggleStatusMembers('rally')">集結中☑</button>
+        <button type="button" id="select-marching-members-button" onclick="toggleStatusMembers('marching')">行軍中☑</button>
+        <button type="button" id="select-arrived-members-button" onclick="toggleStatusMembers('arrived')">到着☑</button>
         <button type="button" id="select-instruction-waiting-members-button" onclick="toggleStatusMembers('instruction-waiting')">指示待ち全員選択</button>
         <button type="button" onclick="resetSelectedMembers()">選択メンバを指示待ちに戻す</button>
       </div>
@@ -197,12 +190,12 @@
         <thead>
           <tr>
             <th>選択</th>
-            <th>名前</th>
+            <th class="sortable-header" onclick="sortByHeader('name')">名前</th>
             <th>状態</th>
-            <th>行軍時間</th>
+            <th class="sortable-header" onclick="sortByHeader('march-time')">行軍時間</th>
             <th>出発まで</th>
-            <th>出発時刻</th>
-            <th>到着時刻</th>
+            <th class="sortable-header" onclick="sortByHeader('departure-time')">出発時刻</th>
+            <th class="sortable-header" onclick="sortByHeader('arrival-time')">到着時刻</th>
           </tr>
         </thead>
         <tbody id="members-tbody">
@@ -256,6 +249,7 @@
     let syncInterval = null;
     let timezone = localStorage.getItem('rally_commander_timezone') || 'UTC';
     let memberSort = 'name';
+    let memberSortDirection = 1;
 
     // メンバ用ステート
     let myState = { departure_time: null, rally_start_time: null, march_start_time: null, target_time: null, rally_minutes: 0 };
@@ -593,10 +587,13 @@
       marchInput.value = '';
     }
 
-    function sortMembers(sortType) {
-      memberSort = ['name', 'march-time', 'arrival-time', 'departure-time'].includes(sortType)
-        ? sortType
-        : 'name';
+    function sortByHeader(sortType) {
+      if (memberSort === sortType) {
+        memberSortDirection *= -1;
+      } else {
+        memberSort = sortType;
+        memberSortDirection = 1;
+      }
       updateCommanderTable(allMembers);
     }
 
@@ -710,13 +707,13 @@
 
       tbody.innerHTML = '';
       const sortedMembers = [...members].sort((left, right) => {
-        if (memberSort === 'name') return left.name.localeCompare(right.name, 'ja');
+        if (memberSort === 'name') return memberSortDirection * left.name.localeCompare(right.name, 'ja');
         const property = memberSort === 'march-time'
           ? 'march_time'
           : memberSort === 'arrival-time' ? 'target_time' : 'departure_time';
         const leftValue = property === 'march_time' ? Number(left[property]) || 0 : left[property] || Infinity;
         const rightValue = property === 'march_time' ? Number(right[property]) || 0 : right[property] || Infinity;
-        return leftValue - rightValue;
+        return memberSortDirection * (leftValue - rightValue);
       });
 
       sortedMembers.forEach(member => {
