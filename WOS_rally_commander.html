@@ -185,12 +185,12 @@
         </div>
       </div>
       <div class="member-selection-actions" aria-label="メンバ一括選択">
-        <button type="button" id="select-all-members-button" onclick="toggleAllMembers()">全員選択</button>
-        <button type="button" id="select-waiting-members-button" onclick="toggleStatusMembers('waiting')">待機中全員選択</button>
-        <button type="button" id="select-rally-members-button" onclick="toggleStatusMembers('rally')">集結中全員選択</button>
-        <button type="button" id="select-marching-members-button" onclick="toggleStatusMembers('marching')">行軍中全員選択</button>
-        <button type="button" id="select-arrived-members-button" onclick="toggleStatusMembers('arrived')">到着全員選択</button>
-        <button type="button" id="select-instruction-waiting-members-button" onclick="toggleStatusMembers('instruction-waiting')">指示待ち全員選択</button>
+        <button type="button" id="select-all-members-button" onclick="toggleAllMembers()">全員☑</button>
+        <button type="button" id="select-waiting-members-button" onclick="toggleStatusMembers('waiting')">待機中全員☑</button>
+        <button type="button" id="select-rally-members-button" onclick="toggleStatusMembers('rally')">集結中全員☑</button>
+        <button type="button" id="select-marching-members-button" onclick="toggleStatusMembers('marching')">行軍中全員☑</button>
+        <button type="button" id="select-arrived-members-button" onclick="toggleStatusMembers('arrived')">到着全員☑</button>
+        <button type="button" id="select-instruction-waiting-members-button" onclick="toggleStatusMembers('instruction-waiting')">指示待ち全員☑</button>
         <button type="button" onclick="resetSelectedMembers()">選択メンバを指示待ちに戻す</button>
       </div>
       <table id="members-table">
@@ -656,7 +656,7 @@
         if (!button) return;
         const ids = members.map(member => member.member_id);
         const allSelected = ids.length > 0 && ids.every(id => selectedIds.has(id));
-        button.textContent = allSelected ? `${label}全解除` : `${label}全選択`;
+        button.textContent = allSelected ? `${label}☐` : `${label}☑`;
       };
       updateLabel('select-all-members-button', allMembers, '全員');
       updateLabel('select-waiting-members-button', getMembersByStatus('waiting'), '待機中全員');
