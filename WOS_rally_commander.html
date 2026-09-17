@@ -100,6 +100,7 @@
     .radio-option { display: inline-flex; align-items: center; gap: 4px; font-weight: normal; }
     .sortable-header { cursor: pointer; user-select: none; }
     .sortable-header:hover { background-color: #eef2ff; }
+    .sort-indicator { display: inline-block; margin-left: 4px; font-size: 0.75em; }
     .member-tools { display: flex; gap: 10px; flex-wrap: wrap; align-items: end; margin-bottom: 12px; }
     .member-tools .form-group { margin-bottom: 0; }
     .member-tools input, .member-tools select { width: auto; }
@@ -189,13 +190,13 @@
       <table id="members-table">
         <thead>
           <tr>
-            <th>選択</th>
-            <th class="sortable-header" onclick="sortByHeader('name')">名前</th>
+            <th id="sort-header-selection" class="sortable-header" onclick="sortByHeader('selection')">選択<span class="sort-indicator"></span></th>
+            <th id="sort-header-name" class="sortable-header" onclick="sortByHeader('name')">名前<span class="sort-indicator"></span></th>
             <th>状態</th>
-            <th class="sortable-header" onclick="sortByHeader('march-time')">行軍時間</th>
+            <th id="sort-header-march-time" class="sortable-header" onclick="sortByHeader('march-time')">行軍時間<span class="sort-indicator"></span></th>
             <th>出発まで</th>
-            <th class="sortable-header" onclick="sortByHeader('departure-time')">出発時刻</th>
-            <th class="sortable-header" onclick="sortByHeader('arrival-time')">到着時刻</th>
+            <th id="sort-header-departure-time" class="sortable-header" onclick="sortByHeader('departure-time')">出発時刻<span class="sort-indicator"></span></th>
+            <th id="sort-header-arrival-time" class="sortable-header" onclick="sortByHeader('arrival-time')">到着時刻<span class="sort-indicator"></span></th>
           </tr>
         </thead>
         <tbody id="members-tbody">
@@ -597,6 +598,22 @@
       updateCommanderTable(allMembers);
     }
 
+    function updateSortIndicators() {
+      const headers = {
+        selection: 'sort-header-selection',
+        name: 'sort-header-name',
+        'march-time': 'sort-header-march-time',
+        'departure-time': 'sort-header-departure-time',
+        'arrival-time': 'sort-header-arrival-time',
+      };
+      Object.entries(headers).forEach(([sortType, headerId]) => {
+        const indicator = document.querySelector(`#${headerId} .sort-indicator`);
+        if (indicator) indicator.textContent = sortType === memberSort
+          ? (memberSortDirection === 1 ? '▲' : '▼')
+          : '';
+      });
+    }
+
     function getSelectedMemberIds() {
       return Array.from(document.querySelectorAll('.member-checkbox:checked')).map(cb => cb.value);
     }
@@ -608,6 +625,7 @@
       });
       updateTargetTimeMinimum();
       updateSelectionButtonLabels();
+      updateSortIndicators();
     }
 
     function toggleMembers(memberIds) {
@@ -706,6 +724,11 @@
 
       tbody.innerHTML = '';
       const sortedMembers = [...members].sort((left, right) => {
+        if (memberSort === 'selection') {
+          const leftValue = checkedIds.has(left.member_id) ? 0 : 1;
+          const rightValue = checkedIds.has(right.member_id) ? 0 : 1;
+          return memberSortDirection * (leftValue - rightValue);
+        }
         if (memberSort === 'name') return memberSortDirection * left.name.localeCompare(right.name, 'ja');
         const property = memberSort === 'march-time'
           ? 'march_time'
