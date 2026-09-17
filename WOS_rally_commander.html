@@ -734,15 +734,15 @@
         const display = document.getElementById('member-countdown');
         const statusEl = document.getElementById('member-status');
 
-        if (myState.rally_start_time && now < myState.rally_start_time) {
-          const remainingMs = myState.rally_start_time - now;
+        if (now < myState.departure_time) {
+          const remainingMs = myState.departure_time - now;
           setCountdownDisplay(display, remainingMs);
           statusEl.className = 'status-text status-waiting';
-          statusEl.textContent = '状態: 集結開始待ち';
-        } else if (now < myState.departure_time) {
-          setCountdownDisplay(display, myState.departure_time - now);
+          statusEl.textContent = '状態: 出発待ち';
+        } else if (myState.march_start_time && now < myState.march_start_time) {
+          setCountdownDisplay(display, myState.march_start_time - now);
           statusEl.className = 'status-text status-waiting';
-          statusEl.textContent = `集結中（出発まで・${myState.rally_minutes || 0}分）`;
+          statusEl.textContent = `集結中（${myState.rally_minutes || 0}分）`;
         } else if (now < myState.target_time) {
           setCountdownDisplay(display, myState.target_time - now);
           statusEl.className = 'status-text status-marching';
@@ -775,6 +775,10 @@
             tr.className = 'row-waiting';
             statusEl.textContent = '待機中';
             countdownEl.textContent = Math.ceil((member.departure_time - now) / 1000) + '秒';
+          } else if (member.march_start_time && now < member.march_start_time) {
+            tr.className = 'row-waiting';
+            statusEl.textContent = '集結中';
+            countdownEl.textContent = Math.ceil((member.march_start_time - now) / 1000) + '秒';
           } else if (now < member.target_time) {
             tr.className = 'row-marching';
             statusEl.textContent = '行軍中';

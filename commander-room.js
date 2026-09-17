@@ -144,10 +144,11 @@ export class CommanderRoom {
           const member = this.members.get(id);
           if (member) {
             const memberMarchTime = Number(member.march_time) || 0;
-            const memberDepartureTime = marchStartTimeReady + (maxMarchTime - memberMarchTime) * 1000;
+            const memberDepartureTime = departureTimeReady + (maxMarchTime - memberMarchTime) * 1000;
+            const memberMarchStartTime = memberDepartureTime + rallyMinutesReady * 60 * 1000;
             member.rally_minutes = rallyMinutesReady;
-            member.rally_start_time = departureTimeReady;
-            member.march_start_time = memberDepartureTime;
+            member.rally_start_time = memberDepartureTime;
+            member.march_start_time = memberMarchStartTime;
             member.target_time = targetTimeReady;
             member.departure_time = memberDepartureTime;
           }
