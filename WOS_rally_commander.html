@@ -98,6 +98,9 @@
     }
     .radio-group { display: flex; gap: 10px; flex-wrap: wrap; }
     .radio-option { display: inline-flex; align-items: center; gap: 4px; font-weight: normal; }
+    .member-tools { display: flex; gap: 10px; flex-wrap: wrap; align-items: end; margin-bottom: 12px; }
+    .member-tools .form-group { margin-bottom: 0; }
+    .member-tools input, .member-tools select { width: auto; }
   </style>
 </head>
 <body>
@@ -161,6 +164,26 @@
     <button id="close-room-button" class="close-room-button hidden" onclick="closeCommanderRoom()">ルームを閉じる</button>
 
     <div class="table-responsive">
+      <div class="member-tools">
+        <div class="form-group">
+          <label for="manual-member-name">名前</label>
+          <input type="text" id="manual-member-name" placeholder="メンバ名">
+        </div>
+        <div class="form-group">
+          <label for="manual-member-march-time">行軍時間 (秒)</label>
+          <input type="number" id="manual-member-march-time" min="1" placeholder="秒">
+        </div>
+        <button type="button" onclick="addManualMember()" style="width: auto;">メンバを追加</button>
+        <div class="form-group">
+          <label for="member-sort">並び順</label>
+          <select id="member-sort" onchange="sortMembers(this.value)">
+            <option value="name">名前順</option>
+            <option value="march-time">行軍時間順</option>
+            <option value="arrival-time">到着時間順</option>
+            <option value="departure-time">出発時間順</option>
+          </select>
+        </div>
+      </div>
       <div class="member-selection-actions" aria-label="メンバ一括選択">
         <button type="button" onclick="selectAllMembers()">全員選択</button>
         <button type="button" onclick="selectAvailableMembers()">待機中・行軍中を除く全員選択</button>
@@ -225,9 +248,10 @@
     let currentRoomId = null;
     let syncInterval = null;
     let timezone = localStorage.getItem('rally_commander_timezone') || 'UTC';
+    let memberSort = 'name';
 
     // メンバ用ステート
-    let myState = { departure_time: null, march_start_time: null, target_time: null, rally_minutes: 0 };
+    let myState = { departure_time: null, rally_start_time: null, march_start_time: null, target_time: null, rally_minutes: 0 };
     // 指示役用ステート
     let allMembers = [];
 
@@ -347,22 +371,20 @@
         (longest, member) => Math.max(longest, Number(member.march_time) || 0),
         0,
       );
-      return getServerTime() + (maxMarchTime * 1000);
+      return getServerTime() + (maxMarchTime * 1000) + (getRallyMinutes() * 60 * 1000);
     }
 
     function updateTargetTimeMinimum() {
       if (role !== 'commander') return;
       const minimumTimestamp = getEarliestTargetTime();
-      const rallyMinutes = getRallyMinutes();
-      const adjustedMinimumTimestamp = minimumTimestamp + rallyMinutes * 60 * 1000;
       const input = document.getElementById('target-time-input');
       const label = document.getElementById('target-time-label');
       const currentLabel = document.getElementById('target-time-current');
       const minimumLabel = document.getElementById('target-time-minimum');
       label.textContent = `到着時刻指定 (${timezone})`;
-      input.min = formatInputTime(adjustedMinimumTimestamp);
+      input.min = formatInputTime(minimumTimestamp);
       currentLabel.textContent = `現在時刻: ${formatDateLabel(getServerTime())} ${formatTime(getServerTime())} (${timezone})`;
-      minimumLabel.textContent = `最短到着可能時刻: ${formatDateLabel(adjustedMinimumTimestamp)} ${formatTime(adjustedMinimumTimestamp)} (${timezone})`;
+      minimumLabel.textContent = `最短到着可能時刻: ${formatDateLabel(minimumTimestamp)} ${formatTime(minimumTimestamp)} (${timezone})`;
     }
 
     function getTargetTimestamp(timeInput) {
@@ -435,7 +457,7 @@
         }
 
         if (data.type === 'member-reset' && role === 'member') {
-          myState = { departure_time: null, march_start_time: null, target_time: null, rally_minutes: 0 };
+          myState = { departure_time: null, rally_start_time: null, march_start_time: null, target_time: null, rally_minutes: 0 };
           document.getElementById('member-departure').textContent = '未定';
           document.getElementById('member-arrival').textContent = '未定';
           document.getElementById('member-rally-duration').textContent = '0分';
@@ -448,7 +470,7 @@
           if (syncInterval) clearInterval(syncInterval);
           syncInterval = null;
           currentRoomId = null;
-          myState = { departure_time: null, march_start_time: null, target_time: null, rally_minutes: 0 };
+          myState = { departure_time: null, rally_start_time: null, march_start_time: null, target_time: null, rally_minutes: 0 };
           document.getElementById('member-status').textContent = '状態: ルーム終了';
           resetCountdownDisplay(document.getElementById('member-countdown'));
           document.getElementById('member-departure').textContent = '未定';
@@ -534,6 +556,36 @@
       document.getElementById('close-room-button').classList.add('hidden');
     }
 
+    function addManualMember() {
+      const nameInput = document.getElementById('manual-member-name');
+      const marchInput = document.getElementById('manual-member-march-time');
+      const name = nameInput.value.trim();
+      const marchTime = Number(marchInput.value);
+      if (!name || !Number.isFinite(marchTime) || marchTime <= 0) {
+        return alert('名前と1秒以上の行軍時間を入力してください');
+      }
+      if (!ws || ws.readyState !== WebSocket.OPEN) {
+        return alert('先に監視を開始してください');
+      }
+      ws.send(JSON.stringify({
+        type: 'add-member',
+        payload: {
+          member_id: `manual-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+          name,
+          march_time: marchTime,
+        },
+      }));
+      nameInput.value = '';
+      marchInput.value = '';
+    }
+
+    function sortMembers(sortType) {
+      memberSort = ['name', 'march-time', 'arrival-time', 'departure-time'].includes(sortType)
+        ? sortType
+        : 'name';
+      updateCommanderTable(allMembers);
+    }
+
     function getSelectedMemberIds() {
       return Array.from(document.querySelectorAll('.member-checkbox:checked')).map(cb => cb.value);
     }
@@ -597,11 +649,10 @@
       }
 
       const targetTime = getTargetTimestamp(timeInput);
-      const minimumTargetTime = getEarliestTargetTime();
       const rallyMinutes = getRallyMinutes();
-      const adjustedMinimumTargetTime = minimumTargetTime + rallyMinutes * 60 * 1000;
-      if (targetTime < adjustedMinimumTargetTime) {
-        alert(`指定時刻では間に合わないメンバがいます。\n最短到着可能時刻: ${formatDateLabel(adjustedMinimumTargetTime)} ${formatTime(adjustedMinimumTargetTime)} (${timezone})`);
+      const minimumTargetTime = getEarliestTargetTime();
+      if (targetTime < minimumTargetTime) {
+        alert(`指定時刻では間に合わないメンバがいます。\n最短到着可能時刻: ${formatDateLabel(minimumTargetTime)} ${formatTime(minimumTargetTime)} (${timezone})`);
         return;
       }
 
@@ -614,13 +665,23 @@
       const checkedIds = new Set(getSelectedMemberIds());
 
       tbody.innerHTML = '';
-      members.forEach(member => {
+      const sortedMembers = [...members].sort((left, right) => {
+        if (memberSort === 'name') return left.name.localeCompare(right.name, 'ja');
+        const property = memberSort === 'march-time'
+          ? 'march_time'
+          : memberSort === 'arrival-time' ? 'target_time' : 'departure_time';
+        const leftValue = property === 'march_time' ? Number(left[property]) || 0 : left[property] || Infinity;
+        const rightValue = property === 'march_time' ? Number(right[property]) || 0 : right[property] || Infinity;
+        return leftValue - rightValue;
+      });
+
+      sortedMembers.forEach(member => {
         const isChecked = checkedIds.has(member.member_id) ? 'checked' : '';
         const tr = document.createElement('tr');
         tr.id = `row-${member.member_id}`;
         
         tr.innerHTML = `
-          <td><input type="checkbox" class="member-checkbox" value="${member.member_id}" ${isChecked}></td>
+          <td><input type="checkbox" class="member-checkbox" value="${member.member_id}" ${isChecked} onchange="updateTargetTimeMinimum()"></td>
           <td>${member.name}</td>
           <td id="status-${member.member_id}">指示待ち</td>
           <td>${member.march_time}秒</td>
@@ -641,15 +702,15 @@
         const display = document.getElementById('member-countdown');
         const statusEl = document.getElementById('member-status');
 
-        if (now < myState.departure_time) {
-          const remainingMs = myState.departure_time - now;
+        if (myState.rally_start_time && now < myState.rally_start_time) {
+          const remainingMs = myState.rally_start_time - now;
           setCountdownDisplay(display, remainingMs);
           statusEl.className = 'status-text status-waiting';
-          statusEl.textContent = '状態: 行軍待機中';
-        } else if (myState.march_start_time && now < myState.march_start_time) {
-          setCountdownDisplay(display, myState.march_start_time - now);
+          statusEl.textContent = '状態: 集結開始待ち';
+        } else if (now < myState.departure_time) {
+          setCountdownDisplay(display, myState.departure_time - now);
           statusEl.className = 'status-text status-waiting';
-          statusEl.textContent = `集結中 (${myState.rally_minutes || 0}分)`;
+          statusEl.textContent = `集結中（出発まで・${myState.rally_minutes || 0}分）`;
         } else if (now < myState.target_time) {
           setCountdownDisplay(display, myState.target_time - now);
           statusEl.className = 'status-text status-marching';

@@ -93,11 +93,31 @@ export class CommanderRoom {
             name: payload.name,
             march_time: payload.march_time,
             rally_minutes: existing.rally_minutes || 0,
+            rally_start_time: existing.rally_start_time || null,
             march_start_time: existing.march_start_time || null,
             target_time: existing.target_time,
             departure_time: existing.departure_time
           });
         }
+        this.broadcastState();
+        break;
+
+      case 'add-member':
+        if (session.role !== 'commander') return;
+        if (!payload || typeof payload.member_id !== 'string' || typeof payload.name !== 'string' ||
+            !payload.name.trim() || !Number.isFinite(Number(payload.march_time)) || Number(payload.march_time) <= 0) {
+          return;
+        }
+        this.members.set(payload.member_id, {
+          member_id: payload.member_id,
+          name: payload.name.trim(),
+          march_time: Number(payload.march_time),
+          rally_minutes: 0,
+          rally_start_time: null,
+          march_start_time: null,
+          target_time: null,
+          departure_time: null,
+        });
         this.broadcastState();
         break;
 
@@ -119,14 +139,17 @@ export class CommanderRoom {
 
         const departureTimeReady = now + 5000;
         const marchStartTimeReady = departureTimeReady + rallyMinutesReady * 60 * 1000;
+        const targetTimeReady = marchStartTimeReady + maxMarchTime * 1000;
         for (const id of payload.target_member_ids) {
           const member = this.members.get(id);
           if (member) {
-            const targetTime = marchStartTimeReady + (Number(member.march_time) || 0) * 1000;
+            const memberMarchTime = Number(member.march_time) || 0;
+            const memberDepartureTime = marchStartTimeReady + (maxMarchTime - memberMarchTime) * 1000;
             member.rally_minutes = rallyMinutesReady;
-            member.march_start_time = marchStartTimeReady;
-            member.target_time = targetTime;
-            member.departure_time = departureTimeReady;
+            member.rally_start_time = departureTimeReady;
+            member.march_start_time = memberDepartureTime;
+            member.target_time = targetTimeReady;
+            member.departure_time = memberDepartureTime;
           }
         }
         this.broadcastState();
@@ -159,9 +182,10 @@ export class CommanderRoom {
           if (member) {
             const marchStartTime = targetTime - member.march_time * 1000;
             member.rally_minutes = rallyMinutesTarget;
+            member.rally_start_time = marchStartTime - rallyMinutesTarget * 60 * 1000;
             member.march_start_time = marchStartTime;
             member.target_time = targetTime;
-            member.departure_time = marchStartTime - rallyMinutesTarget * 60 * 1000;
+            member.departure_time = marchStartTime;
           }
         }
         this.broadcastState();
@@ -174,6 +198,7 @@ export class CommanderRoom {
           if (!member) continue;
           member.target_time = null;
           member.departure_time = null;
+          member.rally_start_time = null;
           member.march_start_time = null;
           member.rally_minutes = 0;
           for (const memberSession of this.sessions) {
