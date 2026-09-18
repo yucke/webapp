@@ -1047,25 +1047,25 @@ function updateRoomStatus(message, connected = false) {
 
             if (!value) {
                 input.classList.remove('invalid');
-                validation.classList.remove('invalid');
-                preview.textContent = '--:--:--';
-                validation.textContent = '';
+                validation?.classList.remove('invalid');
+                if (preview) preview.textContent = '--:--:--';
+                if (validation) validation.textContent = '';
                 return;
             }
 
             const parsed = parseTargetTimeValue(value);
 
             input.classList.toggle('invalid', value.length === 6 && !parsed);
-            validation.classList.toggle('invalid', value.length === 6 && !parsed);
+            validation?.classList.toggle('invalid', value.length === 6 && !parsed);
 
             if (parsed) {
-                preview.textContent = formatTargetTimeValue(value);
-                validation.textContent = isSaved ? '保存済み' : '形式OK';
+                if (preview) preview.textContent = formatTargetTimeValue(value);
+                if (validation) validation.textContent = isSaved ? '保存済み' : '形式OK';
                 return;
             }
 
-            preview.textContent = '--:--:--';
-            validation.textContent = value.length === 6
+            if (preview) preview.textContent = '--:--:--';
+            if (validation) validation.textContent = value.length === 6
                 ? '00:00:00〜23:59:59 の範囲で入力してください（プレビューは保存済みの時刻を使用）'
                 : 'HH:MM:SS の形式で入力してください';
         }
