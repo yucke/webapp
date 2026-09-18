@@ -153,18 +153,30 @@
   <!-- 指示役用画面 -->
   <div id="commander-view" class="container hidden">
     <h2>👑 指示役画面</h2>
-    <div class="timezone-control">
-      <span>時刻表示</span>
-      <div class="radio-group">
-        <label class="radio-option"><input type="radio" name="commander-timezone" value="UTC" onchange="changeTimezone(this.value)"> UTC</label>
-        <label class="radio-option"><input type="radio" name="commander-timezone" value="JST" onchange="changeTimezone(this.value)"> JST</label>
+    <details id="commander-settings" class="member-settings" open>
+      <summary>設定を表示 / 編集</summary>
+      <div style="padding: 0 15px 15px;">
+        <div class="timezone-control">
+          <span>時刻表示</span>
+          <div class="radio-group">
+            <label class="radio-option"><input type="radio" name="commander-timezone" value="UTC" onchange="changeTimezone(this.value)"> UTC</label>
+            <label class="radio-option"><input type="radio" name="commander-timezone" value="JST" onchange="changeTimezone(this.value)"> JST</label>
+          </div>
+        </div>
+        <div class="form-group" style="display: flex; gap: 10px;">
+          <input type="text" id="cmd-room-id" placeholder="合言葉" style="flex: 1;">
+          <button onclick="initCommanderRoom()" style="width: auto;">共有開始</button>
+        </div>
+        <button id="close-room-button" class="close-room-button hidden" onclick="closeCommanderRoom()">共有終了</button>
+        <div class="form-group">
+          <label for="discord-webhook-url">Discord Webhook URL</label>
+          <input type="text" id="discord-webhook-url" placeholder="https://discord.com/api/webhooks/..." autocomplete="off" onchange="saveDiscordWebhookUrl()">
+        </div>
+        <div class="form-group">
+          <label class="radio-option"><input type="checkbox" id="discord-auto-post-checkbox" onchange="saveDiscordAutoPostSetting()"> 号令送信時に自動でDiscordへ投稿する</label>
+        </div>
       </div>
-    </div>
-    <div class="form-group" style="display: flex; gap: 10px;">
-      <input type="text" id="cmd-room-id" placeholder="合言葉" style="flex: 1;">
-      <button onclick="initCommanderRoom()" style="width: auto;">共有開始</button>
-    </div>
-    <button id="close-room-button" class="close-room-button hidden" onclick="closeCommanderRoom()">共有終了</button>
+    </details>
 
     <div class="table-responsive">
       <div class="member-tools">
@@ -186,6 +198,7 @@
         <button type="button" id="select-arrived-members-button" onclick="toggleStatusMembers('arrived')">到着☑</button>
         <button type="button" id="select-instruction-waiting-members-button" onclick="toggleStatusMembers('instruction-waiting')">指示待ち全員選択</button>
         <button type="button" onclick="resetSelectedMembers()">選択メンバを指示待ちに戻す</button>
+        <button type="button" onclick="postSelectedMembersToDiscord()">Discord投稿</button>
       </div>
       <table id="members-table">
         <thead>
@@ -256,14 +269,17 @@
     let myState = { departure_time: null, rally_start_time: null, march_start_time: null, target_time: null, rally_minutes: 0 };
     // 指示役用ステート
     let allMembers = [];
+    let pendingDiscordPostMemberIds = null;
 
     // --- 画面初期化 ---
     if (role === 'commander') {
       document.getElementById('commander-view').classList.remove('hidden');
+      loadDiscordSettings();
     } else {
       document.getElementById('member-view').classList.remove('hidden');
     }
     setTimezoneSelection(timezone);
+    restoreCachedConnectionState();
 
     // --- ユーティリティ ---
     function getServerTime() {
@@ -445,6 +461,13 @@
           if (role === 'commander') {
             allMembers = data.payload.members || [];
             updateCommanderTable(allMembers);
+            if (pendingDiscordPostMemberIds) {
+              const targetIds = new Set(pendingDiscordPostMemberIds);
+              const members = allMembers.filter(member => targetIds.has(member.member_id));
+              pendingDiscordPostMemberIds = null;
+              localStorage.removeItem('rally_commander_pending_discord_post');
+              if (members.length > 0) postToDiscordWebhook(buildRallyAnnouncementMessage(members));
+            }
           } else {
             myState = data.payload;
             document.getElementById('member-departure').textContent = formatTime(myState.departure_time);
@@ -486,6 +509,7 @@
 
       ws.onclose = () => {
         console.log("WebSocket切断");
+        cacheConnectionState();
       };
     }
 
@@ -556,6 +580,7 @@
       localStorage.setItem('rally_commander_command_room', roomId);
       connectWebSocket(roomId);
       document.getElementById('close-room-button').classList.remove('hidden');
+      document.getElementById('commander-settings').open = false;
     }
 
     function closeCommanderRoom() {
@@ -563,6 +588,7 @@
       if (!confirm('このルームを閉じて、メンバの接続を解除しますか？')) return;
       ws.send(JSON.stringify({ type: 'close-room' }));
       document.getElementById('close-room-button').classList.add('hidden');
+      document.getElementById('commander-settings').open = true;
     }
 
     function addManualMember() {
@@ -686,10 +712,76 @@
       ws.send(JSON.stringify({ type: 'reset-members', payload: { target_member_ids: targetIds } }));
     }
 
+    // --- Discord Webhook 連携 ---
+    // 号令チャット用の投稿文を組み立てる共通ロジック（他の投稿箇所からも再利用する）
+    function formatRallyMemberLine(member) {
+      const rallyMinutes = Number.isFinite(member.rally_minutes) ? member.rally_minutes : 0;
+      const departure = formatTime(member.departure_time);
+      const arrival = formatTime(member.target_time);
+      return `${member.name}:${rallyMinutes}分：${departure}→${arrival}`;
+    }
+
+    function buildRallyAnnouncementMessage(members) {
+      return members.map(formatRallyMemberLine).join('\n');
+    }
+
+    function loadDiscordSettings() {
+      const webhookUrl = localStorage.getItem('rally_commander_discord_webhook_url') || '';
+      const autoPost = localStorage.getItem('rally_commander_discord_auto_post') === 'true';
+      const urlInput = document.getElementById('discord-webhook-url');
+      const autoPostCheckbox = document.getElementById('discord-auto-post-checkbox');
+      if (urlInput) urlInput.value = webhookUrl;
+      if (autoPostCheckbox) autoPostCheckbox.checked = autoPost;
+    }
+
+    function saveDiscordWebhookUrl() {
+      const urlInput = document.getElementById('discord-webhook-url');
+      localStorage.setItem('rally_commander_discord_webhook_url', urlInput.value.trim());
+    }
+
+    function saveDiscordAutoPostSetting() {
+      const autoPostCheckbox = document.getElementById('discord-auto-post-checkbox');
+      localStorage.setItem('rally_commander_discord_auto_post', String(autoPostCheckbox.checked));
+    }
+
+    function getDiscordWebhookUrl() {
+      return localStorage.getItem('rally_commander_discord_webhook_url') || '';
+    }
+
+    function isDiscordAutoPostEnabled() {
+      return localStorage.getItem('rally_commander_discord_auto_post') === 'true';
+    }
+
+    async function postToDiscordWebhook(content) {
+      const webhookUrl = getDiscordWebhookUrl();
+      if (!webhookUrl) return alert('Discord Webhook URLを設定してください');
+      if (!content) return alert('投稿するメンバがいません');
+      try {
+        await fetch(webhookUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ content }),
+        });
+      } catch (error) {
+        console.error('Discordへの投稿に失敗しました', error);
+        alert('Discordへの投稿に失敗しました');
+      }
+    }
+
+    function postSelectedMembersToDiscord() {
+      const members = getSelectedMembers();
+      if (members.length === 0) return alert('対象メンバを選択してください');
+      postToDiscordWebhook(buildRallyAnnouncementMessage(members));
+    }
+
     function sendCommandReady() {
       const targetIds = getSelectedMemberIds();
       if (targetIds.length === 0) return alert("対象メンバを選択してください");
       const rallyMinutes = getRallyMinutes();
+      if (isDiscordAutoPostEnabled()) {
+        pendingDiscordPostMemberIds = targetIds;
+        localStorage.setItem('rally_commander_pending_discord_post', JSON.stringify(targetIds));
+      }
       ws.send(JSON.stringify({ type: 'command_ready', payload: { target_member_ids: targetIds, rally_minutes: rallyMinutes } }));
     }
 
@@ -715,6 +807,10 @@
       }
 
       ws.send(JSON.stringify({ type: 'command_target', payload: { target_member_ids: targetIds, target_time: targetTime, rally_minutes: rallyMinutes } }));
+      if (isDiscordAutoPostEnabled()) {
+        pendingDiscordPostMemberIds = targetIds;
+        localStorage.setItem('rally_commander_pending_discord_post', JSON.stringify(targetIds));
+      }
     }
 
     function updateCommanderTable(members) {
@@ -835,6 +931,52 @@
       }
 
       requestAnimationFrame(renderLoop);
+    }
+
+    // WebSocket切断時、直近の状態をlocalStorageへ退避する
+    function cacheConnectionState() {
+      if (role === 'commander') {
+        localStorage.setItem('rally_commander_members_cache', JSON.stringify(allMembers));
+        if (pendingDiscordPostMemberIds) {
+          localStorage.setItem('rally_commander_pending_discord_post', JSON.stringify(pendingDiscordPostMemberIds));
+        }
+      } else {
+        localStorage.setItem('rally_commander_member_state_cache', JSON.stringify(myState));
+      }
+    }
+
+    function restoreCachedConnectionState() {
+      if (role === 'commander') {
+        try {
+          const cachedMembers = JSON.parse(localStorage.getItem('rally_commander_members_cache') || '[]');
+          if (Array.isArray(cachedMembers) && cachedMembers.length > 0) {
+            allMembers = cachedMembers;
+            updateCommanderTable(allMembers);
+          }
+        } catch (_) {
+          // 破損したキャッシュは無視する
+        }
+        try {
+          const cachedPending = JSON.parse(localStorage.getItem('rally_commander_pending_discord_post') || 'null');
+          if (Array.isArray(cachedPending) && cachedPending.length > 0) {
+            pendingDiscordPostMemberIds = cachedPending;
+          }
+        } catch (_) {
+          // 破損したキャッシュは無視する
+        }
+      } else {
+        try {
+          const cachedState = JSON.parse(localStorage.getItem('rally_commander_member_state_cache') || 'null');
+          if (cachedState) {
+            myState = cachedState;
+            document.getElementById('member-departure').textContent = formatTime(myState.departure_time);
+            document.getElementById('member-arrival').textContent = formatTime(myState.target_time);
+            document.getElementById('member-rally-duration').textContent = `${myState.rally_minutes || 0}分`;
+          }
+        } catch (_) {
+          // 破損したキャッシュは無視する
+        }
+      }
     }
 
     function restoreSavedConnection() {
