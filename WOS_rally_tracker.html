@@ -603,8 +603,6 @@
                 <input type="text" id="targetTimeInput" inputmode="numeric" maxlength="8" placeholder="09:00:00" aria-label="目標着弾時刻 HH:MM:SS" aria-describedby="targetTimeFormat targetTimePreview targetTimeValidation" autocomplete="off" oninput="handleTargetTimeInput(event)" onblur="handleTargetTimeBlur()">
                 <span class="target-time-format" id="targetTimeFormat">HH:MM:SS</span>
             </div>
-            <div class="target-time-preview" id="targetTimePreview">00:00:00</div>
-            <div class="target-time-validation" id="targetTimeValidation"></div>
         </div>
         <div class="clock-display" id="systemClock">00:00:00</div>
     </div>
@@ -678,7 +676,10 @@
             <div class="panel">
                 <h2>
                     <span>📋 進行中の行軍一覧</span>
-                    <button class="btn-secondary" onclick="copyScheduleToClipboard()">📋 コピー</button>
+                    <span>
+                        <button class="btn-secondary" onclick="copyScheduleToClipboard()">📋 コピー</button>
+                        <button class="btn-secondary" onclick="postScheduleToDiscord()">📮 Discord</button>
+                    </span>
                 </h2>
                 <div id="rallyListContainer">
                     <div class="empty-state">実行中の集結はありません</div>
@@ -1252,7 +1253,7 @@ function updateRoomStatus(message, connected = false) {
             rallies.sort((a, b) => a.arrivalTimeMs - b.arrivalTimeMs);
             saveAndRenderRallies({ type: 'upsert-rally', rally });
             showToast(`${leader.name} を${rallyMin}分集結で追加しました`);
-            postScheduleToDiscord();
+            postNewRallyToDiscord(rally);
         }
 
         function addLeader() {
@@ -1529,7 +1530,7 @@ function updateRoomStatus(message, connected = false) {
             rallies.sort((a, b) => a.arrivalTimeMs - b.arrivalTimeMs);
             saveAndRenderRallies({ type: 'upsert-rally', rally: changedRally });
             closeModal();
-            if (isNewEntry) postScheduleToDiscord();
+            if (isNewEntry) postNewRallyToDiscord(changedRally);
         }
 
         // --- スケジュール描画 & 自動削除 ---
@@ -1645,15 +1646,18 @@ function updateRoomStatus(message, connected = false) {
 
         // --- クリップボードコピー ---
         // コピー内容とDiscord投稿内容を共通化する
+        function buildRallyLine(r) {
+            const arrivalStr = formatTime(new Date(r.arrivalTimeMs));
+            return `${r.leaderName} : ${r.rallyMin}分 | ${arrivalStr}`;
+        }
+
         function buildScheduleText() {
             const tzLabel = tzMode === 'utc' ? 'UTC' : '現地';
             let text = `【着弾スケジュール】 (${tzLabel})
 `;
 
             rallies.forEach(r => {
-                const arrivalStr = formatTime(new Date(r.arrivalTimeMs));
-                text += `・${r.leaderName} : ${r.rallyMin}分 | ${arrivalStr}
-`;
+                text += buildRallyLine(r) + '\n';
             });
 
             return text;
@@ -1687,18 +1691,31 @@ function updateRoomStatus(message, connected = false) {
             return localStorage.getItem('rally_v7_discord_webhook_url') || '';
         }
 
-        async function postScheduleToDiscord() {
+        async function postToDiscordWebhook(content) {
             const webhookUrl = getDiscordWebhookUrl();
-            if (!webhookUrl || rallies.length === 0) return;
+            if (!webhookUrl) return;
             try {
                 await fetch(webhookUrl, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ content: buildScheduleText() }),
+                    body: JSON.stringify({ content }),
                 });
             } catch (error) {
                 console.error('Discordへの投稿に失敗しました', error);
             }
+        }
+
+        // 新規追加された行だけを自動投稿する
+        function postNewRallyToDiscord(rally) {
+            if (!getDiscordWebhookUrl()) return;
+            postToDiscordWebhook(buildRallyLine(rally));
+        }
+
+        // コピーボタンと同じ内容を手動投稿する
+        function postScheduleToDiscord() {
+            if (rallies.length === 0) return alert('投稿する行軍情報がありません。');
+            if (!getDiscordWebhookUrl()) return alert('Discord Webhook URLを設定してください。');
+            postToDiscordWebhook(buildScheduleText());
         }
 
         function showToast(msg) {
