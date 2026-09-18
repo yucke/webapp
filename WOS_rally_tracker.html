@@ -600,8 +600,8 @@
         <div class="target-title">🎯 目標着弾時刻 (<span class="tz-label">現地</span>)</div>
         <div class="target-time-editor">
             <div class="target-time-field">
-                <input type="text" id="targetTimeInput" inputmode="numeric" maxlength="6" placeholder="090000" aria-label="目標着弾時刻 HHmmss" aria-describedby="targetTimeFormat targetTimePreview targetTimeValidation" autocomplete="off" oninput="handleTargetTimeInput(event)" onblur="handleTargetTimeBlur()">
-                <span class="target-time-format" id="targetTimeFormat">HHmmss</span>
+                <input type="text" id="targetTimeInput" inputmode="numeric" maxlength="8" placeholder="09:00:00" aria-label="目標着弾時刻 HH:MM:SS" aria-describedby="targetTimeFormat targetTimePreview targetTimeValidation" autocomplete="off" oninput="handleTargetTimeInput(event)" onblur="handleTargetTimeBlur()">
+                <span class="target-time-format" id="targetTimeFormat">HH:MM:SS</span>
             </div>
             <div class="target-time-preview" id="targetTimePreview">00:00:00</div>
             <div class="target-time-validation" id="targetTimeValidation"></div>
@@ -623,6 +623,13 @@
         </div>
         <span class="room-status" id="roomStatus" role="status" style="margin-left: auto;">未接続</span>
     </div>
+    <div class="target-bar room-bar" style="padding: 8px 12px; align-items: center;">
+        <div class="target-title" style="margin-right: 10px;">🔔 Discord通知</div>
+        <div style="display: flex; flex: 1; gap: 8px; align-items: center; min-width: 200px;">
+            <input type="text" id="discordWebhookUrl" autocomplete="off" placeholder="Webhook URL（未設定なら投稿しません）" style="margin: 0; flex: 1;" onchange="saveDiscordWebhookUrl()">
+        </div>
+    </div>
+
 
     <div class="grid-layout">
         <!-- 左側: リーダー追加（折りたたみ式） -->
@@ -765,6 +772,7 @@
             loadTargetTime();
             loadMyMarchTime();
             loadRoomSettings();
+            loadDiscordWebhookUrl();
             renderLeaders();
             renderRallies();
             setInterval(updateLoop, 200); // 5Hz高精度更新
@@ -1058,21 +1066,25 @@ function updateRoomStatus(message, connected = false) {
             preview.textContent = '--:--:--';
             validation.textContent = value.length === 6
                 ? '00:00:00〜23:59:59 の範囲で入力してください（プレビューは保存済みの時刻を使用）'
-                : '6桁の HHmmss を入力してください';
+                : 'HH:MM:SS の形式で入力してください';
+        }
+
+        function formatDigitsWithColons(digits) {
+            return digits.replace(/(\d{2})(\d{0,2})(\d{0,2})/, (_, h, m, s) => [h, m, s].filter(Boolean).join(':'));
         }
 
         function loadTargetTime() {
             const input = document.getElementById('targetTimeInput');
             const savedValue = getSavedTargetTimeValue();
             const value = savedValue || getTargetTimeDigitsFromDate();
-            input.value = value;
+            input.value = formatDigitsWithColons(value);
             updateTargetTimeUI(value, !!savedValue);
         }
 
         function saveTargetTime() {
             const input = document.getElementById('targetTimeInput');
             const value = input.value.replace(/\D/g, '').slice(0, 6);
-            input.value = value;
+            input.value = formatDigitsWithColons(value);
             const parsed = parseTargetTimeValue(value);
             updateTargetTimeUI(value, false);
             if (!parsed) return false;
@@ -1083,14 +1095,12 @@ function updateRoomStatus(message, connected = false) {
         }
 
         function handleTargetTimeInput(event) {
-            const sanitized = event.target.value.replace(/\D/g, '').slice(0, 6);
-            if (event.target.value !== sanitized) {
-                event.target.value = sanitized;
-            }
+            const digits = event.target.value.replace(/\D/g, '').slice(0, 6);
+            event.target.value = formatDigitsWithColons(digits);
 
-            updateTargetTimeUI(sanitized);
+            updateTargetTimeUI(digits);
             if (selectedLeaderId) updateModalPreview();
-            if (sanitized.length === 6) {
+            if (digits.length === 6) {
                 saveTargetTime();
             }
         }
@@ -1100,7 +1110,7 @@ function updateRoomStatus(message, connected = false) {
             const input = document.getElementById('targetTimeInput');
             const savedValue = getSavedTargetTimeValue();
             const fallback = savedValue || getTargetTimeDigitsFromDate();
-            input.value = fallback;
+            input.value = formatDigitsWithColons(fallback);
             updateTargetTimeUI(fallback, !!savedValue);
             if (selectedLeaderId) updateModalPreview();
         }
@@ -1242,6 +1252,7 @@ function updateRoomStatus(message, connected = false) {
             rallies.sort((a, b) => a.arrivalTimeMs - b.arrivalTimeMs);
             saveAndRenderRallies({ type: 'upsert-rally', rally });
             showToast(`${leader.name} を${rallyMin}分集結で追加しました`);
+            postScheduleToDiscord();
         }
 
         function addLeader() {
@@ -1475,6 +1486,7 @@ function updateRoomStatus(message, connected = false) {
 
             const isLaunchMode = leader.calcMode === 'launch';
             const totalRequiredSec = (selectedRallyMin * 60) + leader.marchSec;
+            const isNewEntry = !editingRallyId;
             let launchMs, arrivalMs;
             let changedRally;
 
@@ -1517,6 +1529,7 @@ function updateRoomStatus(message, connected = false) {
             rallies.sort((a, b) => a.arrivalTimeMs - b.arrivalTimeMs);
             saveAndRenderRallies({ type: 'upsert-rally', rally: changedRally });
             closeModal();
+            if (isNewEntry) postScheduleToDiscord();
         }
 
         // --- スケジュール描画 & 自動削除 ---
@@ -1631,28 +1644,61 @@ function updateRoomStatus(message, connected = false) {
         }
 
         // --- クリップボードコピー ---
+        // コピー内容とDiscord投稿内容を共通化する
+        function buildScheduleText() {
+            const tzLabel = tzMode === 'utc' ? 'UTC' : '現地';
+            let text = `【着弾スケジュール】 (${tzLabel})
+`;
+
+            rallies.forEach(r => {
+                const arrivalStr = formatTime(new Date(r.arrivalTimeMs));
+                text += `・${r.leaderName} : ${r.rallyMin}分 | ${arrivalStr}
+`;
+            });
+
+            return text;
+        }
+
         function copyScheduleToClipboard() {
             if (rallies.length === 0) {
                 alert('コピーする行軍情報がありません。');
                 return;
             }
 
-            const tzLabel = tzMode === 'utc' ? 'UTC' : '現地';
-            let text = `【着弾スケジュール】 (${tzLabel})
-`;
-
-            rallies.forEach(r => {
-                const launchStr = formatTime(new Date(r.launchTimeMs));
-                const arrivalStr = formatTime(new Date(r.arrivalTimeMs));
-                text += `・${r.leaderName} : ${r.rallyMin}分 | ${arrivalStr}
-`;
-            });
-
-            navigator.clipboard.writeText(text).then(() => {
+            navigator.clipboard.writeText(buildScheduleText()).then(() => {
                 showToast('クリップボードにコピーしました！');
             }).catch(() => {
                 alert('コピーに失敗しました。');
             });
+        }
+
+        // --- Discord Webhook 連携 ---
+        function loadDiscordWebhookUrl() {
+            const webhookUrl = localStorage.getItem('rally_v7_discord_webhook_url') || '';
+            document.getElementById('discordWebhookUrl').value = webhookUrl;
+        }
+
+        function saveDiscordWebhookUrl() {
+            const input = document.getElementById('discordWebhookUrl');
+            localStorage.setItem('rally_v7_discord_webhook_url', input.value.trim());
+        }
+
+        function getDiscordWebhookUrl() {
+            return localStorage.getItem('rally_v7_discord_webhook_url') || '';
+        }
+
+        async function postScheduleToDiscord() {
+            const webhookUrl = getDiscordWebhookUrl();
+            if (!webhookUrl || rallies.length === 0) return;
+            try {
+                await fetch(webhookUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ content: buildScheduleText() }),
+                });
+            } catch (error) {
+                console.error('Discordへの投稿に失敗しました', error);
+            }
         }
 
         function showToast(msg) {
