@@ -108,7 +108,6 @@
 </head>
 <body>
 
-  <!-- メンバ用画面 -->
   <div id="member-view" class="container hidden">
     <h2>🎯 メンバ参加画面</h2>
     <div class="timezone-control">
@@ -150,7 +149,6 @@
     </details>
   </div>
 
-  <!-- 指示役用画面 -->
   <div id="commander-view" class="container hidden">
     <h2>👑 指示役画面</h2>
     <details id="commander-settings" class="member-settings" open>
@@ -199,6 +197,7 @@
         <button type="button" id="select-instruction-waiting-members-button" onclick="toggleStatusMembers('instruction-waiting')">指示待ち全員選択</button>
         <button type="button" onclick="resetSelectedMembers()">選択メンバを指示待ちに戻す</button>
         <button type="button" onclick="postSelectedMembersToDiscord()">Discord投稿</button>
+        <button type="button" id="copy-clipboard-button" onclick="copySelectedMembersToClipboard()">コピー</button>
       </div>
       <table id="members-table">
         <thead>
@@ -207,6 +206,7 @@
             <th id="sort-header-name" class="sortable-header" onclick="sortByHeader('name')">名前<span class="sort-indicator"></span></th>
             <th>状態</th>
             <th id="sort-header-march-time" class="sortable-header" onclick="sortByHeader('march-time')">行軍時間<span class="sort-indicator"></span></th>
+            <th>差分</th>
             <th>出発まで</th>
             <th id="sort-header-departure-time" class="sortable-header" onclick="sortByHeader('departure-time')">出発時刻<span class="sort-indicator"></span></th>
             <th id="sort-header-arrival-time" class="sortable-header" onclick="sortByHeader('arrival-time')">到着時刻<span class="sort-indicator"></span></th>
@@ -384,6 +384,30 @@
       return allMembers.filter(member => selectedIds.has(member.member_id));
     }
 
+    function getSortedMembers(members) {
+      const checkedIds = new Set(getSelectedMemberIds());
+      return [...members].sort((left, right) => {
+        if (memberSort === 'selection') {
+          const leftValue = checkedIds.has(left.member_id) ? 0 : 1;
+          const rightValue = checkedIds.has(right.member_id) ? 0 : 1;
+          return memberSortDirection * (leftValue - rightValue);
+        }
+        if (memberSort === 'name') return memberSortDirection * left.name.localeCompare(right.name, 'ja');
+        const property = memberSort === 'march-time'
+          ? 'march_time'
+          : memberSort === 'arrival-time' ? 'target_time' : 'departure_time';
+        const leftValue = property === 'march_time' ? Number(left[property]) || 0 : left[property] || Infinity;
+        const rightValue = property === 'march_time' ? Number(right[property]) || 0 : right[property] || Infinity;
+        return memberSortDirection * (leftValue - rightValue);
+      });
+    }
+
+    function getSelectedSortedMembers() {
+      const sorted = getSortedMembers(allMembers);
+      const selectedIds = new Set(getSelectedMemberIds());
+      return sorted.filter(member => selectedIds.has(member.member_id));
+    }
+
     function getEarliestTargetTime() {
       const maxMarchTime = getSelectedMembers().reduce(
         (longest, member) => Math.max(longest, Number(member.march_time) || 0),
@@ -463,7 +487,7 @@
             updateCommanderTable(allMembers);
             if (pendingDiscordPostMemberIds) {
               const targetIds = new Set(pendingDiscordPostMemberIds);
-              const members = allMembers.filter(member => targetIds.has(member.member_id));
+              const members = getSortedMembers(allMembers).filter(member => targetIds.has(member.member_id));
               pendingDiscordPostMemberIds = null;
               localStorage.removeItem('rally_commander_pending_discord_post');
               if (members.length > 0) postToDiscordWebhook(buildRallyAnnouncementMessage(members));
@@ -652,6 +676,7 @@
       updateTargetTimeMinimum();
       updateSelectionButtonLabels();
       updateSortIndicators();
+      updateDiffTimeDisplay();
     }
 
     function toggleMembers(memberIds) {
@@ -713,16 +738,17 @@
     }
 
     // --- Discord Webhook 連携 ---
-    // 号令チャット用の投稿文を組み立てる共通ロジック（他の投稿箇所からも再利用する）
-    function formatRallyMemberLine(member) {
+    function formatRallyMemberLine(member, maxMarchTime) {
       const rallyMinutes = Number.isFinite(member.rally_minutes) ? member.rally_minutes : 0;
       const departure = formatTime(member.departure_time);
       const arrival = formatTime(member.target_time);
-      return `${member.name}:${rallyMinutes}分：${departure}→${arrival}`;
+      const diff = maxMarchTime - (Number(member.march_time) || 0);
+      return `${member.name}:${diff}s:${rallyMinutes}min：${departure}→${arrival}`;
     }
 
     function buildRallyAnnouncementMessage(members) {
-      return members.map(formatRallyMemberLine).join('\n');
+      const maxMarchTime = members.reduce((max, m) => Math.max(max, Number(m.march_time) || 0), 0);
+      return members.map(m => formatRallyMemberLine(m, maxMarchTime)).join('\n');
     }
 
     function loadDiscordSettings() {
@@ -769,9 +795,37 @@
     }
 
     function postSelectedMembersToDiscord() {
-      const members = getSelectedMembers();
+      const members = getSelectedSortedMembers();
       if (members.length === 0) return alert('対象メンバを選択してください');
       postToDiscordWebhook(buildRallyAnnouncementMessage(members));
+    }
+
+    function copySelectedMembersToClipboard() {
+      const members = getSelectedSortedMembers();
+      if (members.length === 0) return alert('対象メンバを選択してください');
+      
+      const text = buildRallyAnnouncementMessage(members);
+      const textarea = document.createElement('textarea');
+      textarea.value = text;
+      // 画面のスクロールを防ぐため画面外に配置
+      textarea.style.position = 'fixed';
+      textarea.style.left = '-9999px';
+      document.body.appendChild(textarea);
+      textarea.select();
+      
+      try {
+        document.execCommand('copy');
+        const btn = document.getElementById('copy-clipboard-button');
+        if (btn) {
+          const originalText = btn.textContent;
+          btn.textContent = 'コピーしました！';
+          setTimeout(() => { btn.textContent = originalText; }, 2000);
+        }
+      } catch (err) {
+        console.error('クリップボードへのコピーに失敗しました', err);
+      } finally {
+        document.body.removeChild(textarea);
+      }
     }
 
     function sendCommandReady() {
@@ -813,26 +867,34 @@
       }
     }
 
+    function updateDiffTimeDisplay() {
+      if (role !== 'commander') return;
+      const selectedMembers = getSelectedMembers();
+      let maxMarchTime = 0;
+      if (selectedMembers.length > 0) {
+        maxMarchTime = Math.max(...selectedMembers.map(m => Number(m.march_time) || 0));
+      }
+      
+      allMembers.forEach(member => {
+        const diffEl = document.getElementById(`diff-time-${member.member_id}`);
+        if (diffEl) {
+          if (selectedMembers.length === 0) {
+            diffEl.textContent = '';
+          } else {
+            const diff = maxMarchTime - (Number(member.march_time) || 0);
+            diffEl.textContent = diff === 0 ? `0秒` : `${diff}秒`;
+          }
+        }
+      });
+    }
+
     function updateCommanderTable(members) {
       const tbody = document.getElementById('members-tbody');
       // 現在チェックされているメンバIDを保持
       const checkedIds = new Set(getSelectedMemberIds());
 
       tbody.innerHTML = '';
-      const sortedMembers = [...members].sort((left, right) => {
-        if (memberSort === 'selection') {
-          const leftValue = checkedIds.has(left.member_id) ? 0 : 1;
-          const rightValue = checkedIds.has(right.member_id) ? 0 : 1;
-          return memberSortDirection * (leftValue - rightValue);
-        }
-        if (memberSort === 'name') return memberSortDirection * left.name.localeCompare(right.name, 'ja');
-        const property = memberSort === 'march-time'
-          ? 'march_time'
-          : memberSort === 'arrival-time' ? 'target_time' : 'departure_time';
-        const leftValue = property === 'march_time' ? Number(left[property]) || 0 : left[property] || Infinity;
-        const rightValue = property === 'march_time' ? Number(right[property]) || 0 : right[property] || Infinity;
-        return memberSortDirection * (leftValue - rightValue);
-      });
+      const sortedMembers = getSortedMembers(members);
 
       sortedMembers.forEach(member => {
         const isChecked = checkedIds.has(member.member_id) ? 'checked' : '';
@@ -841,10 +903,11 @@
         tr.dataset.status = '指示待ち';
         
         tr.innerHTML = `
-          <td><input type="checkbox" class="member-checkbox" value="${member.member_id}" ${isChecked} onchange="updateTargetTimeMinimum(); updateSelectionButtonLabels()"></td>
+          <td><input type="checkbox" class="member-checkbox" value="${member.member_id}" ${isChecked} onchange="updateTargetTimeMinimum(); updateSelectionButtonLabels(); updateDiffTimeDisplay();"></td>
           <td>${member.name}</td>
           <td id="status-${member.member_id}">指示待ち</td>
           <td>${member.march_time}秒</td>
+          <td id="diff-time-${member.member_id}"></td>
           <td id="countdown-${member.member_id}" style="font-variant-numeric: tabular-nums;">--</td>
           <td>${formatTime(member.departure_time)}</td>
           <td>${formatTime(member.target_time)}</td>
@@ -854,6 +917,7 @@
       updateTargetTimeMinimum();
       updateSelectionButtonLabels();
       updateSortIndicators();
+      updateDiffTimeDisplay();
     }
 
     // --- 描画ループ (毎フレーム更新) ---
