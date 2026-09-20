@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>週間早見表合成エディタ</title>
+  <title>週間タスク表合成エディタ</title>
   <script src="https://unpkg.com/lucide@latest"></script>
   <style>
     :root {
@@ -171,7 +171,37 @@
       width: 100%; 
       padding: 15px; 
       font-size: 1.1rem;
+      transition: background 0.2s;
     }
+    
+    .btn-generate.success {
+      background: #10b981;
+    }
+
+    /* 新しい4段階ボタンのスタイル */
+    .state-btn {
+      width: 34px;
+      height: 34px;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      background: white;
+      cursor: pointer;
+      font-size: 1rem;
+      font-weight: bold;
+      color: var(--text);
+      padding: 0;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.2s;
+      user-select: none;
+    }
+    .state-btn:hover { background: #f1f5f9; }
+    
+    /* 段階ごとの色分け */
+    .state-btn[data-value="1"] { color: #3b82f6; background: #eff6ff; border-color: #bfdbfe; } /* △: 青系 */
+    .state-btn[data-value="2"] { color: #10b981; background: #ecfdf5; border-color: #a7f3d0; } /* 〇: 緑系 */
+    .state-btn[data-value="3"] { color: #ef4444; background: #fef2f2; border-color: #fecaca; } /* ◎: 赤系 */
 
     .symbol-settings {
       display: flex;
@@ -250,7 +280,7 @@
 
   <div class="symbol-settings">
     <label>出力記号（優先度高い順）:</label>
-    <input type="text" id="symbol-input" class="symbol-input" placeholder="例: ◎◯△" value="◎◯△□◇＊" onchange="saveSettings()">
+    <input type="text" id="symbol-input" class="symbol-input" placeholder="例: ◎〇△□◇＊" value="◎〇△□◇＊" onchange="saveSettings()">
   </div>
 
   <button class="btn btn-generate" onclick="generateOutput()">
@@ -272,7 +302,7 @@
 </datalist>
 
 <script>
-  const STORAGE_KEY = 'wos_task_maker_data';
+  const STORAGE_KEY = 'wos_task_maker_data_v2'; // データ構造が変わったためキーを更新（またはマイグレーション）
   const SETTINGS_KEY = 'wos_task_maker_settings';
   const TEMPLATES_KEY = 'wos_task_maker_templates';
   
@@ -289,11 +319,10 @@
     let width = 0;
     for (let char of str) {
       const code = char.charCodeAt(0);
-      // 全角判定（日本語、全角記号など）
-      if ((code >= 0x2E80 && code <= 0x9FFF) || // CJK統合漢字
-          (code >= 0x3040 && code <= 0x309F) || // ひらがな
-          (code >= 0x30A0 && code <= 0x30FF) || // カタカナ
-          (code >= 0xFF00 && code <= 0xFFEF)) { // 全角英数・記号
+      if ((code >= 0x2E80 && code <= 0x9FFF) || 
+          (code >= 0x3040 && code <= 0x309F) || 
+          (code >= 0x30A0 && code <= 0x30FF) || 
+          (code >= 0xFF00 && code <= 0xFFEF)) { 
         width += 2;
       } else {
         width += 1;
@@ -302,16 +331,13 @@
     return width;
   };
 
-  // 文字列を指定の表示幅に詰める
   const padStringToWidth = (str, targetWidth) => {
     let currentWidth = getStringWidth(str);
     let padding = targetWidth - currentWidth;
     if (padding <= 0) return str.slice(0, targetWidth);
-    // 空白を足す
     return str + '　'.repeat(Math.ceil(padding / 2)) + ' '.repeat(padding % 2);
   };
 
-  // ローカルストレージに保存
   function saveToStorage() {
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(events));
@@ -320,15 +346,27 @@
     }
   }
 
-  // ローカルストレージから復元
   function loadFromStorage() {
     try {
-      const saved = localStorage.getItem(STORAGE_KEY);
+      // 以前のキー(wos_task_maker_data)からのマイグレーションも試みる
+      let saved = localStorage.getItem(STORAGE_KEY) || localStorage.getItem('wos_task_maker_data');
       if (saved) {
         events = JSON.parse(saved);
         if (events.length === 0) {
           events = [{ id: Date.now(), name: "イベント 1", missions: {} }];
         }
+        
+        // マイグレーション: boolean (true/false) を 数値 (3/0) に変換
+        events.forEach(ev => {
+          Object.keys(ev.missions).forEach(m => {
+            ev.missions[m] = ev.missions[m].map(val => {
+              if (val === true) return 3; // 以前ONだったものは◎(3)として復元
+              if (val === false) return 0;
+              return typeof val === 'number' ? val : 0;
+            });
+          });
+        });
+        
         activeEventId = events[0].id;
       }
     } catch (e) {
@@ -336,7 +374,6 @@
     }
   }
 
-  // 設定を保存（記号）
   function saveSettings() {
     try {
       const settings = {
@@ -348,7 +385,6 @@
     }
   }
 
-  // 設定を復元
   function loadSettings() {
     try {
       const saved = localStorage.getItem(SETTINGS_KEY);
@@ -363,20 +399,105 @@
     }
   }
 
-  // テンプレートを読み込む
   function loadTemplates() {
+    // デフォルトテンプレートの定義
+    const defaultTemplates = [
+      {
+        "name": "季節イベント",
+        "missions": {
+          "総力": [1,0,0,0,0,1,0],
+          "加速": [0,0,1,0,0,0,1],
+          "訓練": [0,0,0,1,0,0,0],
+          "欠片": [1,0,1,0,0,0,0],
+          "領主装": [0,0,0,0,0,0,1],
+          "英装備": [0,0,0,0,0,1,0],
+          "採集": [0,0,0,0,0,1,0],
+          "鍵募集": [1,0,1,0,0,0,0],
+          "野巨獣": [0,1,0,0,0,0,0],
+          "ダイヤ": [0,0,0,0,1,0,0]
+        }
+      },
+      {
+        "name": "氷原支配者",
+        "missions": {
+          "火晶": [1,1,0,0,1,0,1],
+          "加速": [1,1,0,0,1,0,1],
+          "訓練": [0,0,0,1,0,1,0],
+          "欠片": [0,1,1,0,0,0,1],
+          "領主装": [0,0,0,0,0,1,1],
+          "領主宝": [1,0,1,1,0,0,0],
+          "英装備": [0,1,0,1,1,0,0],
+          "採集": [0,0,0,0,0,0,1],
+          "ラキル": [0,1,1,0,0,0,0],
+          "ペット": [0,0,1,0,0,0,1],
+          "専門家": [0,1,1,0,0,0,0]
+        }
+      },
+      {
+        "name": "SvS準備フェーズ",
+        "missions": {
+          "火晶": [1,1,0,0,1,0,0],
+          "加速": [1,1,0,0,1,0,0],
+          "訓練": [0,0,0,1,0,0,0],
+          "欠片": [0,1,1,0,0,0,0],
+          "領主装": [0,0,0,0,1,0,0],
+          "領主宝": [1,0,1,1,0,0,0],
+          "英装備": [0,0,0,1,1,0,0],
+          "採集": [0,1,0,0,0,0,0],
+          "ラキル": [0,1,1,0,0,0,0],
+          "ペット": [0,0,1,0,1,0,0],
+          "野巨獣": [0,0,1,0,0,0,0],
+          "専門家": [0,1,1,0,0,0,0]
+        }
+      },
+      {
+        "name": "軍備士官",
+        "missions": {
+          "火晶": [1,1,0,0,0,0,0],
+          "加速": [1,1,0,0,0,0,0],
+          "訓練": [0,0,1,1,0,0,0],
+          "欠片": [1,1,0,0,0,0,1],
+          "領主装": [1,1,0,0,1,1,1],
+          "領主宝": [0,0,1,1,0,0,0],
+          "英装備": [0,0,1,1,1,1,1],
+          "専門家": [1,1,0,0,0,0,0]
+        }
+      },
+      {
+        "name": "同盟大作戦",
+        "missions": {
+          "火晶": [1,1,0,0,1,1,1],
+          "加速": [1,1,0,0,1,1,1],
+          "訓練": [0,0,0,1,0,0,0],
+          "欠片": [0,1,0,0,0,0,0],
+          "領主装": [0,0,0,0,1,1,1],
+          "領主宝": [0,0,1,1,0,1,1],
+          "英装備": [0,0,0,1,0,1,1],
+          "採集": [1,0,1,0,0,0,0],
+          "ペット": [0,0,1,0,0,1,1],
+          "ダイヤ": [1,1,1,1,1,1,1],
+          "トラ": [1,1,1,1,1,1,1]
+        }
+      }
+    ];
+
     try {
       const saved = localStorage.getItem(TEMPLATES_KEY);
-      if (saved) {
-        templates = JSON.parse(saved);
+      let parsed = saved ? JSON.parse(saved) : null;
+      if (parsed && parsed.length > 0) {
+        templates = parsed;
+      } else {
+        templates = defaultTemplates;
+        localStorage.setItem(TEMPLATES_KEY, JSON.stringify(templates));
       }
     } catch (e) {
       console.error('Failed to load templates:', e);
+      templates = defaultTemplates;
     }
+    
     updateTemplateSelect();
   }
 
-  // テンプレートセレクトを更新
   function updateTemplateSelect() {
     const select = document.getElementById('template-select');
     const options = select.querySelectorAll('option:not(:first-child)');
@@ -390,7 +511,6 @@
     });
   }
 
-  // テンプレートを適用
   function applyTemplate() {
     const select = document.getElementById('template-select');
     const index = select.value;
@@ -403,18 +523,21 @@
     const ev = events.find(e => e.id === activeEventId);
     if (!ev) return;
     
-    // ミッション名とチェック状態を適用
     ev.name = template.name;
     ev.missions = {};
     Object.keys(template.missions).forEach(missionName => {
       const checks = template.missions[missionName];
-      // 0と1をboolean に変換
-      ev.missions[missionName] = checks.map(c => c === 1 || c === true);
+      // テンプレートの数値をそのまま適用（旧仕様のbooleanのみ変換）
+      ev.missions[missionName] = checks.map(c => {
+        if (c === true) return 3;
+        if (c === false) return 0;
+        return typeof c === 'number' ? c : 0;
+      });
     });
     
     saveToStorage();
     renderEditor();
-    select.value = ''; // リセット
+    select.value = ''; 
   }
 
   function init() {
@@ -422,100 +545,10 @@
     loadSettings();
     loadTemplates();
 
-templates = [
-  {
-  "name": "季節イベント",
-  "missions": {
-    "総力": [1,0,0,0,0,1,0],
-    "加速": [0,0,1,0,0,0,1],
-    "訓練": [0,0,0,1,0,0,0],
-    "欠片": [1,0,1,0,0,0,0],
-    "領主装": [0,0,0,0,0,0,1],
-    "英装備": [0,0,0,0,0,1,0],
-    "採集": [0,0,0,0,0,1,0],
-    "鍵募集": [1,0,1,0,0,0,0],
-    "野巨獣": [0,1,0,0,0,0,0],
-    "ダイヤ": [0,0,0,0,1,0,0]
-  }
-},
-  // さらにテンプレートを追加できます
-{
-  "name": "氷原支配者",
-  "missions": {
-    "火晶": [1,1,0,0,1,0,1],
-    "加速": [1,1,0,0,1,0,1],
-    "訓練": [0,0,0,1,0,1,0],
-    "欠片": [0,1,1,0,0,0,1],
-    "領主装": [0,0,0,0,0,1,1],
-    "領主宝": [1,0,1,1,0,0,0],
-    "英装備": [0,1,0,1,1,0,0],
-    "採集": [0,0,0,0,0,0,1],
-    "ラキル": [0,1,1,0,0,0,0],
-    "ペット": [0,0,1,0,0,0,1],
-    "専門家": [0,1,1,0,0,0,0]
-  }
-},
-{
-  "name": "SvS準備フェーズ",
-  "missions": {
-    "火晶": [1,1,0,0,1,0,0],
-    "加速": [1,1,0,0,1,0,0],
-    "訓練": [0,0,0,1,0,0,0],
-    "欠片": [0,1,1,0,0,0,0],
-    "領主装": [0,0,0,0,1,0,0],
-    "領主宝": [1,0,1,1,0,0,0],
-    "英装備": [0,0,0,1,1,0,0],
-    "採集": [0,1,0,0,0,0,0],
-    "ラキル": [0,1,1,0,0,0,0],
-    "ペット": [0,0,1,0,1,0,0],
-    "野巨獣": [0,0,1,0,0,0,0],
-    "専門家": [0,1,1,0,0,0,0]
-  }
-},
-{
-  "name": "軍備士官1",
-  "missions": {
-    "火晶": [1,1,0,0,0,0,0],
-    "加速": [1,1,0,0,0,0,0],
-    "訓練": [0,0,1,1,0,0,0],
-    "欠片": [1,1,0,0,0,0,1],
-    "領主装": [1,1,0,0,1,1,1],
-    "領主宝": [0,0,1,1,0,0,0],
-    "英装備": [0,0,1,1,1,1,1],
-    "専門家": [1,1,0,0,0,0,0]
-  }
-},
-{
-  "name": "軍備士官2",
-  "missions": {
-    "欠片": [1,0,0,0,0,0,0],
-    "領主装": [1,0,0,0,0,0,0],
-    "英装備": [1,0,0,0,0,0,0]
-  }
-},
-{
-  "name": "同盟大作戦",
-  "missions": {
-    "火晶": [1,1,0,0,1,1,1],
-    "加速": [1,1,0,0,1,1,1],
-    "訓練": [0,0,0,1,0,0,0],
-    "欠片": [0,1,0,0,0,0,0],
-    "領主装": [0,0,0,0,1,1,1],
-    "領主宝": [0,0,1,1,0,1,1],
-    "英装備": [0,0,0,1,0,1,1],
-    "採集": [1,0,1,0,0,0,0],
-    "ペット": [0,0,1,0,0,1,1],
-    "ダイヤ": [1,1,1,1,1,1,1],
-    "トラ": [1,1,1,1,1,1,1]
-  }
-}
-];
-localStorage.setItem(TEMPLATES_KEY, JSON.stringify(templates));
-        
     // 初期化：保存されたデータがない場合のみデフォルトを適用
     if (events[0].missions && Object.keys(events[0].missions).length === 0) {
       defaultMissions.forEach(m => {
-        events[0].missions[m] = [false, false, false, false, false, false, false];
+        events[0].missions[m] = [0, 0, 0, 0, 0, 0, 0];
       });
     }
     
@@ -557,15 +590,30 @@ localStorage.setItem(TEMPLATES_KEY, JSON.stringify(templates));
     });
   }
 
-  function createRowElement(name, checkArray) {
+  function getDisplaySymbol(val) {
+    if (val === 1) return '△';
+    if (val === 2) return '〇';
+    if (val === 3) return '◎';
+    return '';
+  }
+
+  function createRowElement(name, valArray) {
     const tr = document.createElement('tr');
     let html = `<td><input type="text" class="mission-input" value="${name}" list="mission-list" onchange="saveCurrentState()"></td>`;
-    checkArray.forEach((checked) => {
-      html += `<td><input type="checkbox" class="day-check" ${checked ? 'checked' : ''} onchange="saveCurrentState()"></td>`;
+    valArray.forEach((val) => {
+      html += `<td><button type="button" class="state-btn" data-value="${val}" onclick="toggleState(this)">${getDisplaySymbol(val)}</button></td>`;
     });
     html += `<td><button class="btn btn-remove-row" onclick="this.parentElement.parentElement.remove(); saveCurrentState();">×</button></td>`;
     tr.innerHTML = html;
     return tr;
+  }
+
+  function toggleState(btn) {
+    let val = parseInt(btn.getAttribute('data-value') || '0', 10);
+    val = (val + 1) % 4; // 0->1->2->3->0 とループ
+    btn.setAttribute('data-value', val);
+    btn.innerText = getDisplaySymbol(val);
+    saveCurrentState();
   }
 
   function saveCurrentState() {
@@ -576,7 +624,8 @@ localStorage.setItem(TEMPLATES_KEY, JSON.stringify(templates));
     rows.forEach(row => {
       const name = row.querySelector('.mission-input').value;
       if (!name) return;
-      ev.missions[name] = Array.from(row.querySelectorAll('.day-check')).map(c => c.checked);
+      // .state-btn から data-value を数値として取得
+      ev.missions[name] = Array.from(row.querySelectorAll('.state-btn')).map(btn => parseInt(btn.getAttribute('data-value') || '0', 10));
     });
     saveToStorage();
   }
@@ -586,12 +635,11 @@ localStorage.setItem(TEMPLATES_KEY, JSON.stringify(templates));
     const ev = events.find(e => e.id === activeEventId);
     if (!ev) return;
     
-    // 各ミッションの列を左にシフト（月曜日を削除し、日曜日にfalseを追加）
     Object.keys(ev.missions).forEach(name => {
       const checks = ev.missions[name];
       if (checks.length === 7) {
-        checks.shift();      // 先頭（月曜）を削除
-        checks.push(false);  // 末尾（日曜）に空白（false）を追加
+        checks.shift();      
+        checks.push(0);  // 末尾に空白(0)を追加
       }
     });
     
@@ -604,12 +652,11 @@ localStorage.setItem(TEMPLATES_KEY, JSON.stringify(templates));
     const ev = events.find(e => e.id === activeEventId);
     if (!ev) return;
     
-    // 各ミッションの列を右にシフト（日曜日を削除し、月曜日にfalseを追加）
     Object.keys(ev.missions).forEach(name => {
       const checks = ev.missions[name];
       if (checks.length === 7) {
-        checks.pop();          // 末尾（日曜）を削除
-        checks.unshift(false); // 先頭（月曜）に空白（false）を追加
+        checks.pop();          
+        checks.unshift(0); // 先頭に空白(0)を追加
       }
     });
     
@@ -621,11 +668,10 @@ localStorage.setItem(TEMPLATES_KEY, JSON.stringify(templates));
   function addEvent() {
     if (events.length >= 9) return;
     const newId = Date.now();
-    // 直前のイベントのミッション名をコピー（チェック状態は全てfalseにリセット）
     const prevMissions = events[events.length - 1].missions;
     const newMissions = {};
     Object.keys(prevMissions).forEach(name => {
-      newMissions[name] = [false, false, false, false, false, false, false];
+      newMissions[name] = [0, 0, 0, 0, 0, 0, 0];
     });
     events.push({ id: newId, name: `イベント ${events.length + 1}`, missions: newMissions });
     activeEventId = newId;
@@ -658,7 +704,7 @@ localStorage.setItem(TEMPLATES_KEY, JSON.stringify(templates));
 
   function addRow() {
     const tbody = document.getElementById('mission-body');
-    tbody.appendChild(createRowElement("", [false, false, false, false, false, false, false]));
+    tbody.appendChild(createRowElement("", [0, 0, 0, 0, 0, 0, 0]));
   }
 
   function generateOutput() {
@@ -666,78 +712,72 @@ localStorage.setItem(TEMPLATES_KEY, JSON.stringify(templates));
     const allNames = new Set();
     events.forEach(ev => Object.keys(ev.missions).forEach(n => allNames.add(n)));
     
-    // 最大値を取得
-    let maxCount = 0;
-    allNames.forEach(name => {
-      for (let i = 0; i < 7; i++) {
-        for (let ev of events) {
-          if (ev.missions[name] && ev.missions[name][i]) {
-            let count = 0;
-            events.forEach(e => { if (e.missions[name] && e.missions[name][i]) count++; });
-            maxCount = Math.max(maxCount, count);
-          }
-        }
-      }
-    });
-
-    // 記号を取得
     const symbolInput = document.getElementById('symbol-input').value;
-    const symbols = Array.from(symbolInput); // 1文字ずつ配列に
+    const symbols = Array.from(symbolInput);
     
-    // 数字を記号に変換する関数
-    const convertToSymbol = (num) => {
-      if (num === 0) return "　";
-      const index = maxCount - num; // 最大値から逆算
+    // 設定された値(0~3)を、指定された記号に変換する
+    const convertToSymbol = (val) => {
+      if (val === 0) return "　"; // 空白
+      
+      const index = 3 - val; // 値3なら0番目、値2なら1番目、値1なら2番目
       if (index >= 0 && index < symbols.length) {
         return symbols[index];
       } else {
-        // 記号が足りない場合は全角数字を使用
-        return toFullWidth(num);
+        // 設定記号が不足している場合のフォールバック
+        return val === 3 ? '◎' : val === 2 ? '〇' : val === 1 ? '△' : toFullWidth(val);
       }
     };
     
     let output = "日付　月　火　水　木　金　土　日 \n";
+    
     allNames.forEach(name => {
-      // このミッションが全イベント通じてチェックされているかを確認
-      let hasAnyCheck = false;
+      let dayValues = [];
+      let hasAny = false;
+      
       for (let i = 0; i < 7; i++) {
-        for (let ev of events) {
-          if (ev.missions[name] && ev.missions[name][i]) {
-            hasAnyCheck = true;
-            break;
-          }
-        }
-        if (hasAnyCheck) break;
+        let maxVal = 0;
+        // 複数イベントがある場合は、その曜日の各イベントの中で一番高い優先度（値）を採用する
+        events.forEach(ev => { 
+          if (ev.missions[name] && typeof ev.missions[name][i] === 'number') {
+            maxVal = Math.max(maxVal, ev.missions[name][i]);
+          } 
+        });
+        dayValues.push(maxVal);
+        if (maxVal > 0) hasAny = true;
       }
       
-      // チェックが1つもない場合はスキップ
-      if (!hasAnyCheck) return;
+      // 全く予定がない行はスキップ
+      if (!hasAny) return;
       
-      // ミッション名を全角3文字幅に揃える（全角=2、半角=1）
       let rowText = padStringToWidth(name, 6);
-      let dayCounts = [];
-      for (let i = 0; i < 7; i++) {
-        let count = 0;
-        events.forEach(ev => { if (ev.missions[name] && ev.missions[name][i]) count++; });
-        dayCounts.push(convertToSymbol(count));
-      }
-      output += `${rowText}${dayCounts.join('┃')} \n`;
+      let daySymbols = dayValues.map(val => convertToSymbol(val));
+      output += `${rowText}${daySymbols.join('┃')} \n`;
     });
 
-    // 凡例を追加（1行空けずに次の行に出力）
-    let legendItems = [];
-    for (let i = 0; i < symbols.length; i++) {
-      const eventCount = maxCount - i;
-      if (eventCount > 0) {
-        legendItems.push(`${symbols[i]}:${eventCount}イベント共通`);
-      }
-    }
-    output += legendItems.join(' ') + " \n";
+    // 凡例を追加
+    output += `(優先度) ${symbols[0] || '◎'} ＞ ${symbols[1] || '〇'} ＞ ${symbols[2] || '△'} \n`;
 
     const outputField = document.getElementById('outputText');
     outputField.value = output;
     outputField.select();
-    navigator.clipboard.writeText(output).then(() => alert("コピーしました！"));
+    
+    // alert() を使用せず、ボタンのUIを一時的に変更して通知する
+    const btn = document.querySelector('.btn-generate');
+    const originalContent = btn.innerHTML;
+    
+    navigator.clipboard.writeText(output).then(() => {
+      btn.classList.add('success');
+      btn.innerHTML = '<i data-lucide="check"></i> コピーしました！';
+      lucide.createIcons();
+      
+      setTimeout(() => {
+        btn.classList.remove('success');
+        btn.innerHTML = originalContent;
+        lucide.createIcons();
+      }, 2000);
+    }).catch(err => {
+      console.error('クリップボードへのコピーに失敗しました', err);
+    });
   }
 
   window.onload = init;
