@@ -109,11 +109,30 @@
       font-size: 0.9rem;
     }
 
-    .day-checkbox {
-      width: 18px;
-      height: 18px;
+    /* 新しい4段階ボタンのスタイル */
+    .state-btn {
+      width: 34px;
+      height: 34px;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      background: white;
       cursor: pointer;
+      font-size: 1rem;
+      font-weight: bold;
+      color: var(--text);
+      padding: 0;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.2s;
+      user-select: none;
     }
+    .state-btn:hover { background: #f1f5f9; }
+    
+    /* 段階ごとの色分け */
+    .state-btn[data-value="1"] { color: #3b82f6; background: #eff6ff; border-color: #bfdbfe; } /* △ */
+    .state-btn[data-value="2"] { color: #10b981; background: #ecfdf5; border-color: #a7f3d0; } /* 〇 */
+    .state-btn[data-value="3"] { color: #ef4444; background: #fef2f2; border-color: #fecaca; } /* ◎ */
 
     .btn {
       padding: 8px 16px;
@@ -127,53 +146,16 @@
       font-size: 0.95rem;
     }
 
-    .btn-primary { 
-      background: var(--primary); 
-      color: white; 
-    }
-
-    .btn-primary:hover {
-      background: #4338ca;
-    }
-
-    .btn-secondary { 
-      background: #f1f5f9; 
-      color: var(--text);
-      border: 1px solid var(--border);
-    }
-
-    .btn-secondary:hover {
-      background: #e2e8f0;
-    }
-
-    .btn-add { 
-      background: #10b981; 
-      color: white; 
-    }
-
-    .btn-add:hover {
-      background: #059669;
-    }
-
-    .btn-remove { 
-      background: #ef4444; 
-      color: white; 
-      padding: 4px 8px;
-      font-size: 0.85rem;
-    }
-
-    .btn-remove:hover {
-      background: #dc2626;
-    }
-
-    .btn-copy {
-      background: #8b5cf6;
-      color: white;
-    }
-
-    .btn-copy:hover {
-      background: #7c3aed;
-    }
+    .btn-primary { background: var(--primary); color: white; }
+    .btn-primary:hover { background: #4338ca; }
+    .btn-secondary { background: #f1f5f9; color: var(--text); border: 1px solid var(--border); }
+    .btn-secondary:hover { background: #e2e8f0; }
+    .btn-add { background: #10b981; color: white; }
+    .btn-add:hover { background: #059669; }
+    .btn-remove { background: #ef4444; color: white; padding: 4px 8px; font-size: 0.85rem; }
+    .btn-remove:hover { background: #dc2626; }
+    .btn-copy { background: #8b5cf6; color: white; }
+    .btn-copy:hover { background: #7c3aed; }
 
     .output-section {
       margin-top: 20px;
@@ -235,7 +217,7 @@
   <div class="settings">
     <div class="input-group">
       <label>テンプレート名</label>
-      <input type="text" id="template-name" placeholder="例：通常スケジュール" value="テンプレート1">
+      <input type="text" id="template-name" placeholder="例：通常スケジュール" value="テンプレート1" oninput="generateJSON()">
     </div>
   </div>
 
@@ -289,6 +271,24 @@
       addMission(m, [0, 0, 0, 0, 0, 0, 0]);
     });
     lucide.createIcons();
+    generateJSON(); // 初期表示でJSONを生成
+  }
+
+  // 0~3の値を記号に変換する
+  function getDisplaySymbol(val) {
+    if (val === 1) return '△';
+    if (val === 2) return '〇';
+    if (val === 3) return '◎';
+    return '';
+  }
+
+  // 状態のトグル(0->1->2->3->0)
+  function toggleState(btn) {
+    let val = parseInt(btn.getAttribute('data-value') || '0', 10);
+    val = (val + 1) % 4;
+    btn.setAttribute('data-value', val);
+    btn.innerText = getDisplaySymbol(val);
+    generateJSON();
   }
 
   function addMission(name = "", checks = [0, 0, 0, 0, 0, 0, 0]) {
@@ -297,9 +297,9 @@
     
     let html = `<td class="mission-name-cell"><input type="text" class="mission-input" value="${name}" list="mission-list" oninput="generateJSON()"></td>`;
     
-    checks.forEach((checked, index) => {
-      const isChecked = checked === 1 || checked === true ? 'checked' : '';
-      html += `<td><input type="checkbox" class="day-checkbox" ${isChecked} onchange="generateJSON()"></td>`;
+    checks.forEach((val, index) => {
+      const numVal = typeof val === 'number' ? val : 0;
+      html += `<td><button type="button" class="state-btn" data-value="${numVal}" onclick="toggleState(this)">${getDisplaySymbol(numVal)}</button></td>`;
     });
     
     html += `<td><button class="btn btn-remove" onclick="this.parentElement.parentElement.remove(); generateJSON();">×</button></td>`;
@@ -318,16 +318,11 @@
       
       if (!missionName) return;
 
-      const checkboxes = row.querySelectorAll('.day-checkbox');
-      const checks = Array.from(checkboxes).map(cb => cb.checked ? 1 : 0);
+      const buttons = row.querySelectorAll('.state-btn');
+      const checks = Array.from(buttons).map(btn => parseInt(btn.getAttribute('data-value') || '0', 10));
       
       missions[missionName] = checks;
     });
-
-    const template = {
-      name: name,
-      missions: missions
-    };
 
     // ミッション行単位で改行なしにする
     let jsonStr = '{\n  "name": "' + name + '",\n  "missions": {\n';
@@ -349,15 +344,29 @@
     const jsonOutput = document.getElementById('json-output');
     
     if (!jsonOutput.value) {
-      alert('JSONを生成してください');
+      // カスタムUIでの通知推奨ですが、一旦ツール用なので簡易メッセージ表示
+      const btn = document.querySelector('.btn-copy');
+      const origHtml = btn.innerHTML;
+      btn.innerHTML = 'JSONを生成してください';
+      setTimeout(() => { btn.innerHTML = origHtml; }, 2000);
       return;
     }
 
     jsonOutput.select();
     navigator.clipboard.writeText(jsonOutput.value).then(() => {
-      alert('JSONをコピーしました！\nWOS_task_maker.html のコード内に追加してください');
+      const btn = document.querySelector('.btn-copy');
+      const origHtml = btn.innerHTML;
+      btn.innerHTML = '<i data-lucide="check"></i> コピー完了';
+      btn.style.background = '#10b981';
+      lucide.createIcons();
+      
+      setTimeout(() => {
+        btn.innerHTML = origHtml;
+        btn.style.background = '';
+        lucide.createIcons();
+      }, 2000);
     }).catch(() => {
-      alert('コピーに失敗しました');
+      console.error('コピーに失敗しました');
     });
   }
 
@@ -369,6 +378,7 @@
     defaultMissions.forEach(m => {
       addMission(m, [0, 0, 0, 0, 0, 0, 0]);
     });
+    generateJSON();
   }
 
   window.onload = init;
