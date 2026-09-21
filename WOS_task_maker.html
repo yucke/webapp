@@ -302,7 +302,6 @@
 <script>
   const STORAGE_KEY = 'wos_task_maker_data_v2'; 
   const SETTINGS_KEY = 'wos_task_maker_settings';
-  const TEMPLATES_KEY = 'wos_task_maker_templates';
   
   let events = [{ id: Date.now(), name: "イベント 1", missions: {} }];
   let activeEventId = events[0].id;
@@ -474,18 +473,14 @@
       }
     ];
 
+    // 常にスクリプト内のデフォルトテンプレートを使用する
+    templates = defaultTemplates;
+    
+    // 不要になった過去のテンプレートデータをLocalStorageから削除（お掃除）
     try {
-      const saved = localStorage.getItem(TEMPLATES_KEY);
-      let parsed = saved ? JSON.parse(saved) : null;
-      if (parsed && parsed.length > 0) {
-        templates = parsed;
-      } else {
-        templates = defaultTemplates;
-        localStorage.setItem(TEMPLATES_KEY, JSON.stringify(templates));
-      }
+      localStorage.removeItem('wos_task_maker_templates');
     } catch (e) {
-      console.error('Failed to load templates:', e);
-      templates = defaultTemplates;
+      console.error('Failed to remove old templates:', e);
     }
     
     updateTemplateSelect();
@@ -755,6 +750,7 @@
     };
     
     let output = "日付　月　火　水　木　金　土　日 \n";
+    const usedSymbols = new Set(); // 使われた記号を記録するセット
     
     // 3. 出力テキストの構築
     allNames.forEach(name => {
@@ -766,7 +762,13 @@
         if (rank !== undefined) {
           hasAny = true;
         }
-        daySymbols.push(convertToSymbol(rank));
+        const sym = convertToSymbol(rank);
+        daySymbols.push(sym);
+        
+        // 空白以外は使用済みとして記録
+        if (sym !== "　") {
+          usedSymbols.add(sym);
+        }
       }
       
       if (!hasAny) return; // 全く予定がない行はスキップ
@@ -775,13 +777,29 @@
       output += `${rowText}${daySymbols.join('┃')} \n`;
     });
 
-    // 凡例を追加 (入力された記号を使用)
+    // 凡例を追加 (実際に使用された記号のみを抽出)
     output += `\n(優先度) `;
     let legendParts = [];
-    for (let i = 0; i < Math.min(4, symbols.length); i++) {
-        legendParts.push(symbols[i]);
+    
+    // 設定された記号リストの順序に従って、使用されているかチェック
+    for (let i = 0; i < symbols.length; i++) {
+        if (usedSymbols.has(symbols[i])) {
+            legendParts.push(symbols[i]);
+        }
     }
-    output += legendParts.join(' ＞ ') + ` \n`;
+    
+    // リストにないフォールバック記号(＊など)が使われていた場合の処理
+    usedSymbols.forEach(sym => {
+        if (!symbols.includes(sym)) {
+            legendParts.push(sym);
+        }
+    });
+
+    if (legendParts.length > 0) {
+      output += legendParts.join(' ＞ ') + ` \n`;
+    } else {
+      output += `なし \n`;
+    }
 
     const outputField = document.getElementById('outputText');
     outputField.value = output;
