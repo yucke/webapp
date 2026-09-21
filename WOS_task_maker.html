@@ -178,7 +178,6 @@
       background: #10b981;
     }
 
-    /* 新しい4段階ボタンのスタイル */
     .state-btn {
       width: 34px;
       height: 34px;
@@ -198,10 +197,9 @@
     }
     .state-btn:hover { background: #f1f5f9; }
     
-    /* 段階ごとの色分け */
-    .state-btn[data-value="1"] { color: #3b82f6; background: #eff6ff; border-color: #bfdbfe; } /* △: 青系 */
-    .state-btn[data-value="2"] { color: #10b981; background: #ecfdf5; border-color: #a7f3d0; } /* 〇: 緑系 */
-    .state-btn[data-value="3"] { color: #ef4444; background: #fef2f2; border-color: #fecaca; } /* ◎: 赤系 */
+    .state-btn[data-value="1"] { color: #3b82f6; background: #eff6ff; border-color: #bfdbfe; } 
+    .state-btn[data-value="2"] { color: #10b981; background: #ecfdf5; border-color: #a7f3d0; } 
+    .state-btn[data-value="3"] { color: #ef4444; background: #fef2f2; border-color: #fecaca; } 
 
     .symbol-settings {
       display: flex;
@@ -280,7 +278,7 @@
 
   <div class="symbol-settings">
     <label>出力記号（優先度高い順）:</label>
-    <input type="text" id="symbol-input" class="symbol-input" placeholder="例: ◎〇△□◇＊" value="◎〇△□◇＊" onchange="saveSettings()">
+    <input type="text" id="symbol-input" class="symbol-input" placeholder="例: ◎〇◆◇■□▲△＊" value="◎〇◆◇■□▲△＊" onchange="saveSettings()">
   </div>
 
   <button class="btn btn-generate" onclick="generateOutput()">
@@ -302,7 +300,7 @@
 </datalist>
 
 <script>
-  const STORAGE_KEY = 'wos_task_maker_data_v2'; // データ構造が変わったためキーを更新（またはマイグレーション）
+  const STORAGE_KEY = 'wos_task_maker_data_v2'; 
   const SETTINGS_KEY = 'wos_task_maker_settings';
   const TEMPLATES_KEY = 'wos_task_maker_templates';
   
@@ -314,7 +312,6 @@
   
   const toFullWidth = (num) => String(num).replace(/[0-9]/g, s => String.fromCharCode(s.charCodeAt(0) + 0xFEE0));
 
-  // 文字列の表示幅を計算（全角=2、半角=1）
   const getStringWidth = (str) => {
     let width = 0;
     for (let char of str) {
@@ -348,7 +345,6 @@
 
   function loadFromStorage() {
     try {
-      // 以前のキー(wos_task_maker_data)からのマイグレーションも試みる
       let saved = localStorage.getItem(STORAGE_KEY) || localStorage.getItem('wos_task_maker_data');
       if (saved) {
         events = JSON.parse(saved);
@@ -356,11 +352,10 @@
           events = [{ id: Date.now(), name: "イベント 1", missions: {} }];
         }
         
-        // マイグレーション: boolean (true/false) を 数値 (3/0) に変換
         events.forEach(ev => {
           Object.keys(ev.missions).forEach(m => {
             ev.missions[m] = ev.missions[m].map(val => {
-              if (val === true) return 3; // 以前ONだったものは◎(3)として復元
+              if (val === true) return 3; 
               if (val === false) return 0;
               return typeof val === 'number' ? val : 0;
             });
@@ -400,7 +395,6 @@
   }
 
   function loadTemplates() {
-    // デフォルトテンプレートの定義
     const defaultTemplates = [
       {
         "name": "季節イベント",
@@ -526,7 +520,6 @@
     ev.missions = {};
     Object.keys(template.missions).forEach(missionName => {
       const checks = template.missions[missionName];
-      // テンプレートの数値をそのまま適用（旧仕様のbooleanのみ変換）
       ev.missions[missionName] = checks.map(c => {
         if (c === true) return 3;
         if (c === false) return 0;
@@ -544,7 +537,6 @@
     loadSettings();
     loadTemplates();
 
-    // 初期化：保存されたデータがない場合のみデフォルトを適用
     if (events[0].missions && Object.keys(events[0].missions).length === 0) {
       defaultMissions.forEach(m => {
         events[0].missions[m] = [0, 0, 0, 0, 0, 0, 0];
@@ -609,7 +601,7 @@
 
   function toggleState(btn) {
     let val = parseInt(btn.getAttribute('data-value') || '0', 10);
-    val = (val + 1) % 4; // 0->1->2->3->0 とループ
+    val = (val + 1) % 4;
     btn.setAttribute('data-value', val);
     btn.innerText = getDisplaySymbol(val);
     saveCurrentState();
@@ -623,7 +615,6 @@
     rows.forEach(row => {
       const name = row.querySelector('.mission-input').value;
       if (!name) return;
-      // .state-btn から data-value を数値として取得
       ev.missions[name] = Array.from(row.querySelectorAll('.state-btn')).map(btn => parseInt(btn.getAttribute('data-value') || '0', 10));
     });
     saveToStorage();
@@ -638,7 +629,7 @@
       const checks = ev.missions[name];
       if (checks.length === 7) {
         checks.shift();      
-        checks.push(0);  // 末尾に空白(0)を追加
+        checks.push(0);
       }
     });
     
@@ -655,14 +646,13 @@
       const checks = ev.missions[name];
       if (checks.length === 7) {
         checks.pop();          
-        checks.unshift(0); // 先頭に空白(0)を追加
+        checks.unshift(0);
       }
     });
     
     saveToStorage();
     renderEditor();
   }
-
 
   function addEvent() {
     if (events.length >= 9) return;
@@ -714,69 +704,115 @@
     const symbolInput = document.getElementById('symbol-input').value;
     const symbols = Array.from(symbolInput);
     
-    // 設定された値(0~3)を、指定された記号に変換する
-    const convertToSymbol = (val) => {
-      if (val === 0) return "　"; // 空白
+    // 日付別・ミッション別の合計ポイントを格納
+    const dailyTotals = Array.from({ length: 7 }, () => ({}));
+    
+    // 1. 各日・各ミッションごとの合計優先度を算出
+    allNames.forEach(name => {
+      for (let dayIndex = 0; dayIndex < 7; dayIndex++) {
+        let totalVal = 0;
+        events.forEach(ev => { 
+          if (ev.missions[name] && typeof ev.missions[name][dayIndex] === 'number') {
+            totalVal += ev.missions[name][dayIndex]; // 複数のイベントのポイントを加算
+          } 
+        });
+        if (totalVal > 0) {
+          dailyTotals[dayIndex][name] = totalVal;
+        }
+      }
+    });
+
+    // 2. 日ごとにミッションを合計値でソートし、順位を決定
+    const dailyRanks = Array.from({ length: 7 }, () => ({}));
+    
+    for (let dayIndex = 0; dayIndex < 7; dayIndex++) {
+      const missionsOnDay = dailyTotals[dayIndex];
       
-      const index = 3 - val; // 値3なら0番目、値2なら1番目、値1なら2番目
-      if (index >= 0 && index < symbols.length) {
-        return symbols[index];
+      // 合計値の降順、同値の場合は名前でソート
+      const sortedMissions = Object.entries(missionsOnDay).sort((a, b) => {
+        if (b[1] !== a[1]) {
+          return b[1] - a[1];
+        }
+        return a[0].localeCompare(b[0], 'ja');
+      });
+      
+      // 順位（0始まり）を記録
+      sortedMissions.forEach(([missionName, score], rankIndex) => {
+        dailyRanks[dayIndex][missionName] = rankIndex;
+      });
+    }
+
+    // 順位をもとに記号に変換する関数
+    const convertToSymbol = (rank) => {
+      if (rank === undefined) return "　"; // 空白 (タスクなし)
+      
+      if (rank >= 0 && rank < symbols.length) {
+        return symbols[rank]; // 順位に応じて先頭から記号を割り当て
       } else {
-        // 設定記号が不足している場合のフォールバック
-        return val === 3 ? '◎' : val === 2 ? '〇' : val === 1 ? '△' : toFullWidth(val);
+        // 記号が足りない場合は最後の記号を使う
+        return symbols.length > 0 ? symbols[symbols.length - 1] : "＊";
       }
     };
     
     let output = "日付　月　火　水　木　金　土　日 \n";
     
+    // 3. 出力テキストの構築
     allNames.forEach(name => {
-      let dayValues = [];
+      let daySymbols = [];
       let hasAny = false;
       
-      for (let i = 0; i < 7; i++) {
-        let maxVal = 0;
-        // 複数イベントがある場合は、その曜日の各イベントの中で一番高い優先度（値）を採用する
-        events.forEach(ev => { 
-          if (ev.missions[name] && typeof ev.missions[name][i] === 'number') {
-            maxVal = Math.max(maxVal, ev.missions[name][i]);
-          } 
-        });
-        dayValues.push(maxVal);
-        if (maxVal > 0) hasAny = true;
+      for (let dayIndex = 0; dayIndex < 7; dayIndex++) {
+        const rank = dailyRanks[dayIndex][name];
+        if (rank !== undefined) {
+          hasAny = true;
+        }
+        daySymbols.push(convertToSymbol(rank));
       }
       
-      // 全く予定がない行はスキップ
-      if (!hasAny) return;
+      if (!hasAny) return; // 全く予定がない行はスキップ
       
       let rowText = padStringToWidth(name, 6);
-      let daySymbols = dayValues.map(val => convertToSymbol(val));
       output += `${rowText}${daySymbols.join('┃')} \n`;
     });
 
-    // 凡例を追加
-    output += `(優先度) ${symbols[0] || '◎'} ＞ ${symbols[1] || '〇'} ＞ ${symbols[2] || '△'} \n`;
+    // 凡例を追加 (入力された記号を使用)
+    output += `\n(優先度) `;
+    let legendParts = [];
+    for (let i = 0; i < Math.min(4, symbols.length); i++) {
+        legendParts.push(symbols[i]);
+    }
+    output += legendParts.join(' ＞ ') + ` \n`;
 
     const outputField = document.getElementById('outputText');
     outputField.value = output;
+    outputField.focus();
     outputField.select();
+    outputField.setSelectionRange(0, 99999);
     
-    // alert() を使用せず、ボタンのUIを一時的に変更して通知する
     const btn = document.querySelector('.btn-generate');
     const originalContent = btn.innerHTML;
     
-    navigator.clipboard.writeText(output).then(() => {
+    let copySuccessful = false;
+    try {
+      copySuccessful = document.execCommand('copy');
+    } catch (err) {
+      copySuccessful = false;
+    }
+
+    if (copySuccessful) {
       btn.classList.add('success');
       btn.innerHTML = '<i data-lucide="check"></i> コピーしました！';
+    } else {
+      btn.classList.add('success');
+      btn.innerHTML = '<i data-lucide="check"></i> 選択完了 (Ctrl+Cでコピー)';
+    }
+    lucide.createIcons();
+    
+    setTimeout(() => {
+      btn.classList.remove('success');
+      btn.innerHTML = originalContent;
       lucide.createIcons();
-      
-      setTimeout(() => {
-        btn.classList.remove('success');
-        btn.innerHTML = originalContent;
-        lucide.createIcons();
-      }, 2000);
-    }).catch(err => {
-      console.error('クリップボードへのコピーに失敗しました', err);
-    });
+    }, 2000);
   }
 
   window.onload = init;
