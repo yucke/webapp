@@ -163,7 +163,7 @@
         </div>
         <div class="form-group" style="display: flex; gap: 10px;">
           <input type="text" id="cmd-room-id" placeholder="合言葉" style="flex: 1;">
-          <button onclick="initCommanderRoom()" style="width: auto;">共有開始</button>
+          <button id="start-share-button" onclick="initCommanderRoom()" style="width: auto;">共有開始</button>
         </div>
         <button id="close-room-button" class="close-room-button hidden" onclick="closeCommanderRoom()">共有終了</button>
         <div class="form-group">
@@ -196,6 +196,7 @@
         <button type="button" id="select-arrived-members-button" onclick="toggleStatusMembers('arrived')">到着☑</button>
         <button type="button" id="select-instruction-waiting-members-button" onclick="toggleStatusMembers('instruction-waiting')">指示待ち全員選択</button>
         <button type="button" onclick="resetSelectedMembers()">選択メンバを指示待ちに戻す</button>
+        <button type="button" onclick="removeSelectedMembers()" style="background-color: #ef4444;">削除</button>
         <button type="button" onclick="postSelectedMembersToDiscord()">Discord投稿</button>
         <button type="button" id="copy-clipboard-button" onclick="copySelectedMembersToClipboard()">コピー</button>
       </div>
@@ -448,6 +449,35 @@
     }
 
     // --- WebSocket 通信管理 ---
+    function updateConnectionStatusUI(isOnline) {
+      if (role !== 'commander') return;
+      const statusContainer = document.getElementById('commander-connection-status');
+      const statusText = document.getElementById('commander-connection-text');
+      const startShareBtn = document.getElementById('start-share-button');
+
+      if (statusContainer && statusText) {
+        if (isOnline) {
+          statusContainer.classList.add('online');
+          statusText.textContent = '共有中 (オンライン)';
+          if (startShareBtn) {
+            startShareBtn.disabled = false;
+            startShareBtn.style.backgroundColor = '#9ca3af';
+            startShareBtn.style.cursor = 'pointer';
+            startShareBtn.textContent = '共有中';
+          }
+        } else {
+          statusContainer.classList.remove('online');
+          statusText.textContent = 'ローカル (未共有)';
+          if (startShareBtn) {
+            startShareBtn.disabled = false;
+            startShareBtn.style.backgroundColor = '';
+            startShareBtn.style.cursor = 'pointer';
+            startShareBtn.textContent = '共有開始';
+          }
+        }
+      }
+    }
+
     async function connectWebSocket(roomId) {
       if (ws) ws.close();
       currentRoomId = roomId;
@@ -460,6 +490,19 @@
         console.log("WebSocket接続完了");
         if (role === 'commander') {
           ws.send(JSON.stringify({ type: "join", payload: { role: 'commander' } }));
+          
+          // ローカルで追加された未同期メンバーを一括でサーバーへ送信する
+          const localMembers = allMembers.filter(m => m.is_local_only);
+          localMembers.forEach(member => {
+            ws.send(JSON.stringify({
+              type: 'add-member',
+              payload: {
+                member_id: member.member_id,
+                name: member.name,
+                march_time: member.march_time
+              }
+            }));
+          });
         }
         sendPing();
         if (syncInterval) clearInterval(syncInterval);
@@ -483,8 +526,14 @@
 
         if (data.type === 'state_update') {
           if (role === 'commander') {
-            allMembers = data.payload.members || [];
+            const serverMembers = data.payload.members || [];
+            // サーバーから受信した状態と、ローカルで送信待ちのメンバーをマージする
+            const serverMemberIds = new Set(serverMembers.map(m => m.member_id));
+            const pendingLocalMembers = allMembers.filter(m => m.is_local_only && !serverMemberIds.has(m.member_id));
+            
+            allMembers = [...serverMembers, ...pendingLocalMembers];
             updateCommanderTable(allMembers);
+
             if (pendingDiscordPostMemberIds) {
               const targetIds = new Set(pendingDiscordPostMemberIds);
               const members = getSortedMembers(allMembers).filter(member => targetIds.has(member.member_id));
@@ -519,6 +568,13 @@
           if (syncInterval) clearInterval(syncInterval);
           syncInterval = null;
           currentRoomId = null;
+          
+          // ルーム終了時は確実に通信を切断する
+          if (ws) {
+            ws.close();
+            ws = null;
+          }
+          
           myState = { departure_time: null, rally_start_time: null, march_start_time: null, target_time: null, rally_minutes: 0 };
           document.getElementById('member-status').textContent = '状態: ルーム終了';
           resetCountdownDisplay(document.getElementById('member-countdown'));
@@ -611,6 +667,11 @@
       if (!ws || ws.readyState !== WebSocket.OPEN) return;
       if (!confirm('このルームを閉じて、メンバの接続を解除しますか？')) return;
       ws.send(JSON.stringify({ type: 'close-room' }));
+      
+      // 即座に通信を切断し、以降の操作を完全にローカル運用に移行する
+      ws.close();
+      ws = null;
+      
       document.getElementById('close-room-button').classList.add('hidden');
       document.getElementById('commander-settings').open = true;
     }
@@ -623,17 +684,27 @@
       if (!name || !Number.isFinite(marchTime) || marchTime <= 0) {
         return alert('名前と1秒以上の行軍時間を入力してください');
       }
+      
+      const newMember = {
+        member_id: `manual-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+        name,
+        march_time: marchTime,
+      };
+
       if (!ws || ws.readyState !== WebSocket.OPEN) {
-        return alert('先に共有を開始してください');
+        // 未接続時はローカルにのみ保存してキャッシュへ書き込む
+        newMember.is_local_only = true;
+        allMembers.push(newMember);
+        updateCommanderTable(allMembers);
+        cacheConnectionState();
+      } else {
+        // 接続時は直接サーバーへ送信
+        ws.send(JSON.stringify({
+          type: 'add-member',
+          payload: newMember,
+        }));
       }
-      ws.send(JSON.stringify({
-        type: 'add-member',
-        payload: {
-          member_id: `manual-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-          name,
-          march_time: marchTime,
-        },
-      }));
+
       nameInput.value = '';
       marchInput.value = '';
     }
@@ -733,8 +804,45 @@
       const targetIds = getSelectedMemberIds();
       if (targetIds.length === 0) return alert("対象メンバを選択してください");
       if (!confirm('選択したメンバを指示待ちに戻しますか？')) return;
-      if (!ws || ws.readyState !== WebSocket.OPEN) return alert("ルームに接続していません");
-      ws.send(JSON.stringify({ type: 'reset-members', payload: { target_member_ids: targetIds } }));
+      
+      if (!ws || ws.readyState !== WebSocket.OPEN) {
+        // ローカル運用時：手動で状態をリセット
+        const targetSet = new Set(targetIds);
+        allMembers.forEach(member => {
+          if (targetSet.has(member.member_id)) {
+            member.departure_time = null;
+            member.target_time = null;
+            member.rally_start_time = null;
+            member.march_start_time = null;
+            member.rally_minutes = 0;
+          }
+        });
+        updateCommanderTable(allMembers);
+        cacheConnectionState();
+      } else {
+        ws.send(JSON.stringify({ type: 'reset-members', payload: { target_member_ids: targetIds } }));
+      }
+    }
+
+    function removeSelectedMembers() {
+      const targetIds = getSelectedMemberIds();
+      if (targetIds.length === 0) return alert("削除対象メンバを選択してください");
+      if (!confirm('選択したメンバを一覧から完全に削除しますか？')) return;
+
+      if (!ws || ws.readyState !== WebSocket.OPEN) {
+        // ローカル運用時
+        const targetSet = new Set(targetIds);
+        allMembers = allMembers.filter(member => !targetSet.has(member.member_id));
+        updateCommanderTable(allMembers);
+        cacheConnectionState();
+      } else {
+        // 先にUI上で消してレスポンスを待つ間のタイムラグを無くす
+        const targetSet = new Set(targetIds);
+        allMembers = allMembers.filter(member => !targetSet.has(member.member_id));
+        updateCommanderTable(allMembers);
+        
+        ws.send(JSON.stringify({ type: 'remove-members', payload: { target_member_ids: targetIds } }));
+      }
     }
 
     // --- Discord Webhook 連携 ---
@@ -832,11 +940,44 @@
       const targetIds = getSelectedMemberIds();
       if (targetIds.length === 0) return alert("対象メンバを選択してください");
       const rallyMinutes = getRallyMinutes();
+      
       if (isDiscordAutoPostEnabled()) {
         pendingDiscordPostMemberIds = targetIds;
         localStorage.setItem('rally_commander_pending_discord_post', JSON.stringify(targetIds));
       }
-      ws.send(JSON.stringify({ type: 'command_ready', payload: { target_member_ids: targetIds, rally_minutes: rallyMinutes } }));
+
+      if (!ws || ws.readyState !== WebSocket.OPEN) {
+        // ローカル運用時：クライアント側で時刻を計算して反映
+        const targetSet = new Set(targetIds);
+        const selectedMembers = allMembers.filter(m => targetSet.has(m.member_id));
+        const maxMarchTime = Math.max(...selectedMembers.map(m => Number(m.march_time) || 0));
+        
+        const now = getServerTime();
+        // 5秒後を出発基準とする
+        const targetTime = now + 5000 + (maxMarchTime * 1000) + (rallyMinutes * 60 * 1000);
+
+        allMembers.forEach(member => {
+          if (targetSet.has(member.member_id)) {
+            member.target_time = targetTime;
+            member.rally_minutes = rallyMinutes;
+            member.departure_time = targetTime - (Number(member.march_time) * 1000) - (rallyMinutes * 60 * 1000);
+            member.rally_start_time = member.departure_time;
+            member.march_start_time = member.departure_time + (rallyMinutes * 60 * 1000);
+          }
+        });
+        updateCommanderTable(allMembers);
+        cacheConnectionState();
+
+        // ローカル運用時は即座にDiscordへ投稿
+        if (pendingDiscordPostMemberIds) {
+          const membersToPost = getSortedMembers(allMembers).filter(member => targetSet.has(member.member_id));
+          pendingDiscordPostMemberIds = null;
+          localStorage.removeItem('rally_commander_pending_discord_post');
+          if (membersToPost.length > 0) postToDiscordWebhook(buildRallyAnnouncementMessage(membersToPost));
+        }
+      } else {
+        ws.send(JSON.stringify({ type: 'command_ready', payload: { target_member_ids: targetIds, rally_minutes: rallyMinutes } }));
+      }
     }
 
     function sendCommandTarget() {
@@ -860,10 +1001,36 @@
         return;
       }
 
-      ws.send(JSON.stringify({ type: 'command_target', payload: { target_member_ids: targetIds, target_time: targetTime, rally_minutes: rallyMinutes } }));
       if (isDiscordAutoPostEnabled()) {
         pendingDiscordPostMemberIds = targetIds;
         localStorage.setItem('rally_commander_pending_discord_post', JSON.stringify(targetIds));
+      }
+
+      if (!ws || ws.readyState !== WebSocket.OPEN) {
+        // ローカル運用時：クライアント側で時刻を計算して反映
+        const targetSet = new Set(targetIds);
+        
+        allMembers.forEach(member => {
+          if (targetSet.has(member.member_id)) {
+            member.target_time = targetTime;
+            member.rally_minutes = rallyMinutes;
+            member.departure_time = targetTime - (Number(member.march_time) * 1000) - (rallyMinutes * 60 * 1000);
+            member.rally_start_time = member.departure_time;
+            member.march_start_time = member.departure_time + (rallyMinutes * 60 * 1000);
+          }
+        });
+        updateCommanderTable(allMembers);
+        cacheConnectionState();
+
+        // ローカル運用時は即座にDiscordへ投稿
+        if (pendingDiscordPostMemberIds) {
+          const membersToPost = getSortedMembers(allMembers).filter(member => targetSet.has(member.member_id));
+          pendingDiscordPostMemberIds = null;
+          localStorage.removeItem('rally_commander_pending_discord_post');
+          if (membersToPost.length > 0) postToDiscordWebhook(buildRallyAnnouncementMessage(membersToPost));
+        }
+      } else {
+        ws.send(JSON.stringify({ type: 'command_target', payload: { target_member_ids: targetIds, target_time: targetTime, rally_minutes: rallyMinutes } }));
       }
     }
 
@@ -997,7 +1164,7 @@
       requestAnimationFrame(renderLoop);
     }
 
-    // WebSocket切断時、直近の状態をlocalStorageへ退避する
+    // WebSocket切断時や手動追加時、直近の状態をlocalStorageへ退避する
     function cacheConnectionState() {
       if (role === 'commander') {
         localStorage.setItem('rally_commander_members_cache', JSON.stringify(allMembers));

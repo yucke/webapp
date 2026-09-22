@@ -222,6 +222,24 @@ export class CommanderRoom {
         this.broadcastState();
         break;
 
+      case 'remove-members':
+        if (session.role !== 'commander' || !Array.isArray(payload?.target_member_ids)) return;
+        for (const id of payload.target_member_ids) {
+          this.members.delete(id);
+          // 削除されたメンバに対してもリセット（未接続状態へ戻す）通知を送る
+          for (const memberSession of this.sessions) {
+            if (memberSession.role === 'member' && memberSession.member_id === id && memberSession.ws.readyState === 1) {
+              memberSession.ws.send(JSON.stringify({
+                type: 'member-reset',
+                payload: { departure_time: null, target_time: null },
+              }));
+            }
+          }
+        }
+        await this.saveMembers();
+        this.broadcastState();
+        break;
+        
       case 'close-room':
         if (session.role !== 'commander') return;
         await this.closeRoom();
