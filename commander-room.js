@@ -15,6 +15,17 @@ export class CommanderRoom {
   }
 
   async fetch(request) {
+    // 誰も接続しておらず、最終更新から6時間以上経過していればデータをクリアする
+    const lastUpdated = await this.state.storage.get('last_updated') || 0;
+    const now = Date.now();
+    const SIX_HOURS_MS = 6 * 60 * 60 * 1000;
+    
+    if (this.sessions.length === 0 && lastUpdated > 0 && (now - lastUpdated) > SIX_HOURS_MS) {
+      await this.state.storage.deleteAll();
+      this.members.clear();
+      this.membersLoaded = false;
+    }
+
     await this.loadMembers();
     const pair = new WebSocketPair();
     const [client, server] = Object.values(pair);
@@ -65,6 +76,7 @@ export class CommanderRoom {
           alliances: payload.state.alliances
         };
         await this.state.storage.put('allocatorState', allocatorState);
+        await this.state.storage.put('last_updated', now);
         for (const currentSession of this.sessions) {
           if (currentSession.ws.readyState === 1) {
             currentSession.ws.send(JSON.stringify({ type: 'state', ...allocatorState }));
@@ -272,6 +284,7 @@ export class CommanderRoom {
 
   async saveMembers() {
     await this.state.storage.put('commanderMembers', Array.from(this.members.values()));
+    await this.state.storage.put('last_updated', Date.now());
   }
 
   broadcastState() {
@@ -296,5 +309,3 @@ export class CommanderRoom {
     }
   }
 }
-
-
