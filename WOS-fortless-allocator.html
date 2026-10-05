@@ -345,7 +345,7 @@ function getFacilityAssigneeText(facilityId) {
     .sort((a, b) => a.rank - b.rank)
     .map(a => a.name);
   const firstChoiceText = firstChoiceAlliances.length
-    ? `<span class="unassigned-first-choices">${firstChoiceAlliances.join(', ')}</span>`
+    ? `<span class="unassigned-first-choices">${firstChoiceAlliances.join(',')}希望中</span>`
     : '';
   return `<span style="color:#aaa;">未割当</span>${firstChoiceText}`;
 }
