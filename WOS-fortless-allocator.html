@@ -89,6 +89,9 @@
   .facility-assignee {
     background-color: #fff; padding: 6px; flex: 1; text-align: center; font-size: 0.85em;
   }
+  .unassigned-first-choices {
+    display: block; color: #888; font-size: 0.75em; font-weight: normal;
+  }
 
   /* 汎用バッジ装飾 */
   .status-badge {
@@ -337,7 +340,14 @@ function getFacilityAssigneeText(facilityId) {
   if (alliance) {
     return `<span class="assigned">${alliance.name} 確定</span>`;
   }
-  return '<span style="color:#aaa;">未割当</span>';
+  const firstChoiceAlliances = state.alliances
+    .filter(a => !a.assignedFacilityId && a.preferences[facilityId] === 1)
+    .sort((a, b) => a.rank - b.rank)
+    .map(a => a.name);
+  const firstChoiceText = firstChoiceAlliances.length
+    ? `<span class="unassigned-first-choices">${firstChoiceAlliances.join(', ')}</span>`
+    : '';
+  return `<span style="color:#aaa;">未割当</span>${firstChoiceText}`;
 }
 
 function renderUserForm() {
