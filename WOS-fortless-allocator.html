@@ -621,9 +621,8 @@ function copyStatus() {
   FACILITIES.forEach(f => {
     const assignee = state.alliances.find(a => a.assignedFacilityId === f);
     if (assignee) {
-      text += `${f}：${assignee.name}\n`;
-    } else {
-      text += `${f}：    \n`; 
+      text += `${f}：${assignee.name}, `;
+    } else { 
     }
   });
 
@@ -635,7 +634,7 @@ function copyStatus() {
     if (unassigned.error) {
       text += `→ ⚠ 希望内容では施設を確定できません\n→ ${unassigned.name}の希望再入力待ち\n`;
     } else {
-      text += `→ ${unassigned.name}の確定待ち\n`;
+      text += `→ ${unassigned.name}の入力待ち\n`;
     }
   } else {
     text += "なし\n";
