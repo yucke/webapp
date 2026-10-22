@@ -1,0 +1,377 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>絵文字入力ヘルパー</title>
+  <style>
+    :root {
+      --bg-color: #0f172a;
+      --panel-bg: #1e293b;
+      --key-bg: #334155;
+      --key-hover: #475569;
+      --key-active: #1e293b;
+      --key-border: #475569;
+      --accent: #38bdf8;
+      --accent-glow: rgba(56, 189, 248, 0.35);
+      --text-main: #f8fafc;
+      --text-muted: #94a3b8;
+    }
+
+    * {
+      box-sizing: border-box;
+      user-select: none;
+      -webkit-user-select: none;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      background-color: var(--bg-color);
+      color: var(--text-main);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 16px 12px;
+    }
+
+    /* 上部操作バー */
+    .toolbar {
+      width: 100%;
+      max-width: 720px;
+      display: flex;
+      justify-content: center;
+      margin-bottom: 16px;
+    }
+
+    .mode-switch {
+      display: flex;
+      background: var(--panel-bg);
+      padding: 4px;
+      border-radius: 12px;
+      border: 1px solid var(--key-border);
+      gap: 4px;
+      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.2);
+    }
+
+    .mode-btn {
+      background: transparent;
+      border: none;
+      color: var(--text-muted);
+      font-size: 13px;
+      font-weight: 600;
+      padding: 8px 18px;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+
+    .mode-btn.active {
+      background: var(--accent);
+      color: #0f172a;
+      box-shadow: 0 0 12px var(--accent-glow);
+    }
+
+    /* キーボード盤面 */
+    .keyboard-container {
+      width: 100%;
+      max-width: 720px;
+      background: var(--panel-bg);
+      padding: 14px;
+      border-radius: 16px;
+      border: 1px solid var(--key-border);
+      box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.4);
+    }
+
+    .key-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(64px, 1fr));
+      gap: 8px;
+    }
+
+    /* 各キー */
+    .key-btn {
+      aspect-ratio: 1;
+      background: var(--key-bg);
+      border: 1px solid var(--key-border);
+      border-bottom: 3px solid #1e293b;
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      padding: 6px;
+      position: relative;
+      transition: all 0.1s ease;
+      overflow: hidden;
+      outline: none;
+    }
+
+    .key-btn:hover:not(:disabled) {
+      background: var(--key-hover);
+      border-color: #64748b;
+      transform: translateY(-1px);
+    }
+
+    .key-btn:active:not(:disabled) {
+      transform: translateY(2px);
+      border-bottom-width: 1px;
+      box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.3);
+    }
+
+    /* disabled 状態 */
+    .key-btn:disabled {
+      opacity: 0.25;
+      cursor: not-allowed;
+      filter: grayscale(1);
+      transform: none;
+      border-bottom-width: 3px;
+      box-shadow: none;
+    }
+
+    .key-btn img {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      pointer-events: none;
+    }
+
+    /* トースト通知 */
+    .toast {
+      position: fixed;
+      bottom: 24px;
+      left: 50%;
+      transform: translateX(-50%) translateY(20px);
+      background: rgba(15, 23, 42, 0.95);
+      border: 1px solid var(--accent);
+      color: var(--text-main);
+      padding: 10px 20px;
+      border-radius: 30px;
+      font-size: 13px;
+      font-weight: 500;
+      box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5), 0 0 15px var(--accent-glow);
+      opacity: 0;
+      pointer-events: none;
+      transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+      z-index: 999;
+      white-space: nowrap;
+      max-width: 90vw;
+      text-overflow: ellipsis;
+      overflow: hidden;
+    }
+
+    .toast.show {
+      transform: translateX(-50%) translateY(0);
+      opacity: 1;
+    }
+
+    .toast-code {
+      color: var(--accent);
+      font-family: monospace;
+      font-weight: 700;
+      margin: 0 4px;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- コピー形式切り替えスイッチ -->
+  <div class="toolbar">
+    <div class="mode-switch">
+      <button class="mode-btn active" id="btnModeTag" onclick="setCopyMode('tag')">タグでコピー</button>
+      <button class="mode-btn" id="btnModeChar" onclick="setCopyMode('char')">絵文字でコピー</button>
+    </div>
+  </div>
+
+  <!-- キーボード盤面 -->
+  <div class="keyboard-container">
+    <div class="key-grid" id="keyboardGrid"></div>
+  </div>
+
+  <!-- コピー通知トースト -->
+  <div class="toast" id="toastMessage"></div>
+
+  <script>
+    // ==========================================
+    // 絵文字データ一覧 (JSON形式で定義)
+    // base64 に画像文字列 (data:image/... または生Base64) を代入すると実画像で表示されます
+    // ==========================================
+    const EMOJI_LIST = [
+      { code: "U+E001", char: "", tag: "<item_icon_101>", base64: "" },
+      { code: "U+E002", char: "", tag: "<item_icon_102>", base64: "" },
+      { code: "U+E003", char: "", tag: "<item_icon_103>", base64: "" },
+      { code: "U+E004", char: "", tag: "<item_icon_104>", base64: "" },
+      { code: "U+E005", char: "", tag: "<item_icon_105>", base64: "" },
+      { code: "U+E006", char: "", tag: "<item_icon_106>", base64: "" },
+      { code: "U+E007", char: "", tag: "<item_icon_107>", base64: "" },
+      { code: "U+E009", char: "", tag: "<item_icon_109>", base64: "" },
+      { code: "U+E010", char: "", tag: "<item_icon_100081>", base64: "" },
+      { code: "U+E011", char: "", tag: "<item_icon_620116>", base64: "" },
+      { code: "U+E012", char: "", tag: "<item_icon_100004>", base64: "" },
+      { code: "U+E013", char: "", tag: "<item_icon_200201>", base64: "" },
+      { code: "U+E014", char: "", tag: "<item_icon_200301>", base64: "" },
+      { code: "U+E015", char: "", tag: "<item_icon_200401>", base64: "" },
+      { code: "U+E016", char: "", tag: "<item_icon_500240>", base64: "" },
+      { code: "U+E017", char: "", tag: "<item_icon_200101>", base64: "" },
+      { code: "U+E018", char: "", tag: "<item_icon_620127>", base64: "" },
+      { code: "U+E019", char: "", tag: "<item_icon_500220>", base64: "" },
+      { code: "U+E020", char: "", tag: "<item_icon_620129>", base64: "" },
+      { code: "U+E021", char: "", tag: "<item_icon_620163>", base64: "" },
+      { code: "U+E022", char: "", tag: "<item_icon_620189>", base64: "" },
+      { code: "U+E024", char: "", tag: "<resource_icon_744>", base64: "" },
+      { code: "U+E025", char: "", tag: "<resource_icon_745>", base64: "" },
+      { code: "U+E026", char: "", tag: "<resource_icon_743>", base64: "" },
+      { code: "U+E027", char: "", tag: "<resource_icon_742>", base64: "" },
+      { code: "U+E029", char: "", tag: "<item_icon_620197>", base64: "" },
+      { code: "U+E030", char: "", tag: "<item_icon_620203>", base64: "" },
+      { code: "U+E031", char: "", tag: "<item_icon_620204>", base64: "" },
+      { code: "U+E032", char: "", tag: "<item_icon_620205>", base64: "" },
+      { code: "U+E033", char: "", tag: "<item_icon_620206>", base64: "" },
+      { code: "U+E034", char: "", tag: "<item_icon_620208>", base64: "" },
+      { code: "U+E035", char: "", tag: "<item_icon_620210>", base64: "" },
+      { code: "U+E036", char: "", tag: "<?>", base64: "" },
+      { code: "U+E037", char: "", tag: "<accumulative_icon_001>", base64: "" },
+      { code: "U+E039", char: "", tag: "<item_icon_620240>", base64: "" },
+      { code: "U+E040", char: "", tag: "<item_icon_620261>", base64: "" },
+      { code: "U+E041", char: "", tag: "<?>", base64: "" }
+    ];
+
+    // 現在のコピーモード ('tag' | 'char')
+    let currentMode = 'tag';
+    let toastTimeout = null;
+
+    // 仮置き用SVG生成
+    function createPlaceholderSvg(code) {
+      const hex = code.replace("U+", "");
+      const svg = `
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 80" width="80" height="80">
+          <rect width="80" height="80" rx="14" fill="#1e293b"/>
+          <rect x="5" y="5" width="70" height="70" rx="10" fill="none" stroke="#475569" stroke-width="2" stroke-dasharray="4 3"/>
+          <circle cx="40" cy="34" r="16" fill="#334155"/>
+          <text x="40" y="39" font-family="monospace" font-size="13" font-weight="bold" fill="#38bdf8" text-anchor="middle">${hex}</text>
+          <text x="40" y="64" font-family="sans-serif" font-size="10" font-weight="600" fill="#94a3b8" text-anchor="middle">ICON</text>
+        </svg>
+      `.trim();
+      return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
+    }
+
+    // ボタンの disabled 状態とタイトルを現在のモードに応じて更新
+    function updateKeyDisabledStates() {
+      const buttons = document.querySelectorAll('.key-btn');
+      buttons.forEach(btn => {
+        const itemTag = btn.dataset.tag;
+        const itemChar = btn.dataset.char;
+        const itemCode = btn.dataset.code;
+        const isUnknownTag = itemTag === '<?>';
+
+        if (currentMode === 'tag' && isUnknownTag) {
+          btn.disabled = true;
+          btn.title = `${itemCode}: タグ未定義のためタグコピー不可`;
+        } else {
+          btn.disabled = false;
+          btn.title = currentMode === 'tag' ? `${itemCode} (${itemTag})` : `${itemCode} (${itemChar})`;
+        }
+      });
+    }
+
+    // コピーモードの変更
+    function setCopyMode(mode) {
+      currentMode = mode;
+      document.getElementById('btnModeTag').classList.toggle('active', mode === 'tag');
+      document.getElementById('btnModeChar').classList.toggle('active', mode === 'char');
+      updateKeyDisabledStates();
+    }
+
+    // クリップボードへコピー
+    async function copyToClipboard(text, displayLabel) {
+      try {
+        if (navigator.clipboard && window.isSecureContext) {
+          await navigator.clipboard.writeText(text);
+        } else {
+          const textarea = document.createElement('textarea');
+          textarea.value = text;
+          textarea.style.position = 'fixed';
+          textarea.style.left = '-9999px';
+          document.body.appendChild(textarea);
+          textarea.select();
+          document.execCommand('copy');
+          document.body.removeChild(textarea);
+        }
+        showToast(displayLabel);
+      } catch (err) {
+        showToast('コピーに失敗しました');
+      }
+    }
+
+    // ふわっと表示するトースト通知
+    function showToast(content) {
+      const toast = document.getElementById('toastMessage');
+      toast.innerHTML = `<span class="toast-code">${escapeHtml(content)}</span> をコピーしました`;
+      toast.classList.add('show');
+
+      if (toastTimeout) clearTimeout(toastTimeout);
+      toastTimeout = setTimeout(() => {
+        toast.classList.remove('show');
+      }, 1600);
+    }
+
+    function escapeHtml(str) {
+      return str
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+    }
+
+    // キーボード盤面のレンダリング
+    function renderKeyboard() {
+      const grid = document.getElementById('keyboardGrid');
+      grid.innerHTML = '';
+
+      EMOJI_LIST.forEach(item => {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'key-btn';
+        btn.dataset.code = item.code;
+        btn.dataset.char = item.char;
+        btn.dataset.tag = item.tag;
+
+        // 画像ソースの決定（base64 があれば使用、なければ仮置きSVG）
+        let imgSrc = '';
+        if (item.base64 && item.base64.trim() !== '') {
+          imgSrc = item.base64.startsWith('data:') 
+            ? item.base64 
+            : `data:image/png;base64,${item.base64}`;
+        } else {
+          imgSrc = createPlaceholderSvg(item.code);
+        }
+
+        const img = document.createElement('img');
+        img.src = imgSrc;
+        img.alt = item.code;
+        img.loading = 'lazy';
+        btn.appendChild(img);
+
+        // クリック時コピー処理
+        btn.addEventListener('click', () => {
+          const targetValue = currentMode === 'tag' ? item.tag : item.char;
+          copyToClipboard(targetValue, targetValue);
+        });
+
+        grid.appendChild(btn);
+      });
+
+      // 初期の disabled 状態を反映
+      updateKeyDisabledStates();
+    }
+
+    // 初期化
+    document.addEventListener('DOMContentLoaded', () => {
+      renderKeyboard();
+    });
+  </script>
+</body>
+</html>
