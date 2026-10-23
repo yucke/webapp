@@ -1,0 +1,17 @@
+name = "discord-bot-nickname"
+main = "src/index.js"
+compatibility_date = "2026-08-30"
+
+# プロトタイプ用の固定設定（D1バインディング有効時は使われない）
+[vars]
+GUILD_ID = ""
+VERIFIED_ROLE_ID = ""
+
+# フェーズ2: `wrangler d1 create discord-bot-nickname` の database_id を設定し、コメントを外す
+# [[d1_databases]]
+# binding = "DB"
+# database_name = "discord-bot-nickname"
+# database_id = ""
+# migrations_dir = "migrations"
+
+# シークレット: wrangler secret put DISCORD_BOT_TOKEN / DISCORD_PUBLIC_KEY
